@@ -1,0 +1,495 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy, users & permissions
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users         User[]
+  teams         Team[]
+  companies     Company[]
+  contacts      Contact[]
+  leadSources   LeadSource[]
+  campaigns     Campaign[]
+  pipelines     Pipeline[]
+  leads         Lead[]
+  conversations Conversation[]
+  calls         Call[]
+  tasks         Task[]
+  deals         Deal[]
+  notes         Note[]
+  activities    Activity[]
+  tags          Tag[]
+  integrations  IntegrationAccount[]
+  templates     Template[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  AGENT
+  QA
+  MARKETING
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           Role     @default(AGENT)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  teamMemberships TeamMember[]
+  ownedLeads      Lead[]        @relation("LeadOwner")
+  assignedTasks   Task[]        @relation("TaskAssignee")
+  calls           Call[]
+  notes           Note[]
+  activities      Activity[]
+  stageChanges    LeadStageHistory[]
+  sentMessages    Message[]
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Companies, contacts, leads
+// ---------------------------------------------------------------------------
+
+model Company {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  industry       String?
+  website        String?
+  city           String?
+  state          String?
+  country        String?
+  createdAt      DateTime @default(now())
+
+  contacts Contact[]
+  leads    Lead[]
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  companyId      String?
+  company        Company? @relation(fields: [companyId], references: [id])
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String?
+  createdAt      DateTime @default(now())
+
+  leads Lead[]
+
+  @@index([organizationId, phone])
+  @@index([organizationId, email])
+}
+
+model LeadSource {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+
+  leads     Lead[]
+  campaigns Campaign[]
+
+  @@unique([organizationId, name])
+}
+
+model Campaign {
+  id             String      @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  sourceId       String?
+  source         LeadSource? @relation(fields: [sourceId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  leads Lead[]
+}
+
+model Pipeline {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  isDefault      Boolean  @default(false)
+
+  stages PipelineStage[]
+  leads  Lead[]
+}
+
+model PipelineStage {
+  id         String   @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  name       String
+  order      Int
+  isWon      Boolean  @default(false)
+  isLost     Boolean  @default(false)
+
+  leads          Lead[]
+  historyFrom    LeadStageHistory[] @relation("StageFrom")
+  historyTo      LeadStageHistory[] @relation("StageTo")
+
+  @@unique([pipelineId, order])
+}
+
+enum LeadStatus {
+  OPEN
+  WON
+  LOST
+  NURTURE
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id])
+  companyId      String?
+  company        Company?     @relation(fields: [companyId], references: [id])
+  sourceId       String?
+  source         LeadSource?  @relation(fields: [sourceId], references: [id])
+  campaignId     String?
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
+  pipelineId     String
+  pipeline       Pipeline     @relation(fields: [pipelineId], references: [id])
+  stageId        String
+  stage          PipelineStage @relation(fields: [stageId], references: [id])
+  ownerId        String?
+  owner          User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  status         LeadStatus   @default(OPEN)
+  score          Int          @default(0)
+  scoreReasons   Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  lastActivityAt DateTime     @default(now())
+
+  conversations Conversation[]
+  calls         Call[]
+  tasks         Task[]
+  deals         Deal[]
+  notes         Note[]
+  activities    Activity[]
+  stageHistory  LeadStageHistory[]
+  tags          LeadTag[]
+
+  @@index([organizationId, stageId])
+  @@index([organizationId, ownerId])
+}
+
+model LeadStageHistory {
+  id            String         @id @default(cuid())
+  leadId        String
+  lead          Lead           @relation(fields: [leadId], references: [id])
+  fromStageId   String?
+  fromStage     PipelineStage? @relation("StageFrom", fields: [fromStageId], references: [id])
+  toStageId     String
+  toStage       PipelineStage  @relation("StageTo", fields: [toStageId], references: [id])
+  changedById   String?
+  changedBy     User?          @relation(fields: [changedById], references: [id])
+  changedAt     DateTime       @default(now())
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  color          String   @default("#6366f1")
+
+  leads LeadTag[]
+
+  @@unique([organizationId, name])
+}
+
+model LeadTag {
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([leadId, tagId])
+}
+
+// ---------------------------------------------------------------------------
+// Unified communication: conversations / messages / calls
+// ---------------------------------------------------------------------------
+
+enum Channel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  RECEIVED
+}
+
+model Conversation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  channel        Channel
+  externalId     String?
+  subject        String?
+  lastMessageAt  DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  messages Message[]
+
+  @@index([organizationId, channel])
+  @@index([leadId])
+}
+
+model Message {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id])
+  direction      MessageDirection
+  status         MessageStatus     @default(SENT)
+  body           String?
+  mediaUrl       String?
+  externalId     String?
+  sentById       String?
+  sentBy         User?             @relation(fields: [sentById], references: [id])
+  openedAt       DateTime?
+  createdAt      DateTime          @default(now())
+
+  attachments Attachment[]
+}
+
+model Attachment {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id])
+  url       String
+  filename  String
+  mimeType  String?
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  ANSWERED
+  MISSED
+  NO_ANSWER
+  VOICEMAIL
+}
+
+model Call {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead          @relation(fields: [leadId], references: [id])
+  agentId        String?
+  agent          User?         @relation(fields: [agentId], references: [id])
+  direction      CallDirection
+  status         CallStatus
+  fromNumber     String?
+  toNumber       String?
+  startedAt      DateTime      @default(now())
+  durationSec    Int           @default(0)
+  recordingUrl   String?
+  transcript     String?
+  aiSummary      String?
+  nextAction     String?
+  externalId     String?
+
+  @@index([organizationId, leadId])
+}
+
+// ---------------------------------------------------------------------------
+// Tasks / follow-ups, deals, notes
+// ---------------------------------------------------------------------------
+
+enum TaskType {
+  CALL
+  EMAIL
+  WHATSAPP
+  SMS
+  MEETING
+  OTHER
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  assignedToId   String?
+  assignedTo     User?        @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  type           TaskType     @default(OTHER)
+  title          String
+  notes          String?
+  dueAt          DateTime
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, assignedToId, dueAt])
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+}
+
+model Deal {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  title          String
+  value          Decimal      @default(0) @db.Decimal(12, 2)
+  currency       String       @default("USD")
+  status         DealStatus   @default(OPEN)
+  closedAt       DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+model Note {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  authorId       String?
+  author         User?        @relation(fields: [authorId], references: [id])
+  body           String
+  createdAt      DateTime     @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Unified activity timeline (the "golden record" feed)
+// ---------------------------------------------------------------------------
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_ASSIGNED
+  STAGE_CHANGED
+  MESSAGE_INBOUND
+  MESSAGE_OUTBOUND
+  CALL_LOGGED
+  TASK_CREATED
+  TASK_COMPLETED
+  NOTE_ADDED
+  DEAL_UPDATED
+  SCORE_UPDATED
+}
+
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  type           ActivityType
+  actorId        String?
+  actor          User?        @relation(fields: [actorId], references: [id])
+  summary        String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations & templates
+// ---------------------------------------------------------------------------
+
+enum IntegrationType {
+  WHATSAPP
+  ZOOM_PHONE
+  GMAIL
+  MICROSOFT_365
+  SMS_TWILIO
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  ERROR
+}
+
+model IntegrationAccount {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  type           IntegrationType
+  name           String
+  status         IntegrationStatus @default(NOT_CONFIGURED)
+  config         Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, type, name])
+}
+
+model Template {
+  id             String  @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  channel        Channel
+  name           String
+  body           String
+
+  @@unique([organizationId, channel, name])
+}
