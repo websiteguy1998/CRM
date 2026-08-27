@@ -54,8 +54,13 @@ export default async function IntegrationsSettingsPage() {
             title={t.title}
             description={t.description}
             accounts={integrations
-              .filter((i) => i.type === t.type && i.status === "CONNECTED")
-              .map((i) => ({ id: i.id, name: i.name, status: i.status }))}
+              .filter((i) => i.type === t.type && i.status !== "NOT_CONFIGURED")
+              .map((i) => ({
+                id: i.id,
+                name: i.name,
+                status: i.status,
+                lastError: (i.config as Record<string, unknown> | null)?.lastError as string | undefined,
+              }))}
           />
         ))}
       </div>

@@ -33,7 +33,12 @@ const FIELDS: Record<string, FieldDef[]> = {
   ],
 };
 
-type Account = { id: string; name: string; status: "NOT_CONFIGURED" | "CONNECTED" | "ERROR" };
+type Account = {
+  id: string;
+  name: string;
+  status: "NOT_CONFIGURED" | "CONNECTED" | "ERROR";
+  lastError?: string;
+};
 
 export default function IntegrationTypeCard({
   type,
@@ -99,24 +104,38 @@ export default function IntegrationTypeCard({
       {accounts.length > 0 && (
         <ul className="mb-3 space-y-2">
           {accounts.map((a) => (
-            <li key={a.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-              <span className="text-sm font-medium text-slate-800">{a.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="badge bg-emerald-100 text-emerald-700">Connected</span>
-                <button
-                  onClick={() => remove(a.id)}
-                  disabled={deletingId === a.id}
-                  className="text-xs text-rose-600 hover:underline"
-                >
-                  Remove
-                </button>
+            <li key={a.id} className="rounded-lg bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-800">{a.name}</span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`badge ${
+                      a.status === "CONNECTED" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {a.status === "CONNECTED" ? "Connected" : "Error"}
+                  </span>
+                  <button
+                    onClick={() => remove(a.id)}
+                    disabled={deletingId === a.id}
+                    className="text-xs text-rose-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
+              {a.status === "ERROR" && a.lastError && (
+                <p className="mt-1 text-xs text-rose-600">
+                  Last attempt failed: {a.lastError} — fix the credentials below and re-add it with the
+                  same label to reconnect.
+                </p>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      {type === "GMAIL" && accounts.length > 0 && (
+      {type === "GMAIL" && accounts.some((a) => a.status === "CONNECTED") && (
         <div className="mb-3 border-t border-slate-100 pt-3">
           <CheckEmailButton />
         </div>

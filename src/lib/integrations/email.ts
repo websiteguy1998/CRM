@@ -14,20 +14,31 @@ import { recordInboundMessage } from "@/lib/inbound";
  * per org (Settings → Integrations → "+ Add another").
  */
 
-type GmailConfig = { email: string; appPassword: string };
+type GmailConfig = { email: string; appPassword: string; lastError?: string };
+type GmailAccount = { id: string } & GmailConfig;
 
-async function getGmailConfigs(organizationId: string): Promise<GmailConfig[]> {
+async function getGmailAccounts(organizationId: string): Promise<GmailAccount[]> {
   const accounts = await prisma.integrationAccount.findMany({
     where: { organizationId, type: "GMAIL", status: "CONNECTED" },
     orderBy: { createdAt: "asc" },
   });
   return accounts
-    .map((a) => a.config as Partial<GmailConfig> | null)
-    .filter((c): c is GmailConfig => Boolean(c?.email && c?.appPassword));
+    .map((a) => ({ id: a.id, ...(a.config as Partial<GmailConfig> | null) }))
+    .filter((c): c is GmailAccount => Boolean(c.email && c.appPassword));
+}
+
+/** Records why a send/check attempt failed so Settings → Integrations can show it instead of failing silently. */
+async function markError(accountId: string, message: string) {
+  const account = await prisma.integrationAccount.findUnique({ where: { id: accountId } });
+  const config = (account?.config as Record<string, unknown> | null) ?? {};
+  await prisma.integrationAccount.update({
+    where: { id: accountId },
+    data: { status: "ERROR", config: { ...config, lastError: message } },
+  });
 }
 
 export async function sendEmail(organizationId: string, to: string, subject: string, body: string) {
-  const [gmail] = await getGmailConfigs(organizationId);
+  const [gmail] = await getGmailAccounts(organizationId);
   if (!gmail) {
     return { simulated: true as const, externalId: `sim_email_${Date.now()}` };
   }
@@ -47,12 +58,14 @@ export async function sendEmail(organizationId: string, to: string, subject: str
     });
     return { simulated: false as const, externalId: info.messageId };
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("Gmail send failed, falling back to simulated send", err);
+    await markError(gmail.id, message);
     return { simulated: true as const, externalId: `sim_email_${Date.now()}` };
   }
 }
 
-async function checkOneInbox(gmail: GmailConfig) {
+async function checkOneInbox(gmail: GmailAccount) {
   const client = new ImapFlow({
     host: "imap.gmail.com",
     port: 993,
@@ -62,7 +75,13 @@ async function checkOneInbox(gmail: GmailConfig) {
   });
 
   let checked = 0;
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await markError(gmail.id, message);
+    throw err;
+  }
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
@@ -101,7 +120,7 @@ async function checkOneInbox(gmail: GmailConfig) {
  * a "Check for new emails" button rather than pushed in real time.
  */
 export async function checkGmailInbox(organizationId: string) {
-  const gmails = await getGmailConfigs(organizationId);
+  const gmails = await getGmailAccounts(organizationId);
   if (gmails.length === 0) return { checked: 0, configured: false as const };
 
   let checked = 0;
