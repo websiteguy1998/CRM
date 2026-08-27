@@ -1,28 +1,45 @@
-/**
- * SMS sender via Twilio's REST API. Same simulated-fallback pattern as
- * whatsapp.ts: works out of the box in a demo, sends for real once
- * TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER are set.
- * Inbound delivery is via the webhook at /api/webhooks/sms.
- */
-export async function sendSms(to: string, body: string) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_FROM_NUMBER;
+import { prisma } from "@/lib/prisma";
 
-  if (!sid || !token || !from) {
+/**
+ * SMS sender via Twilio's REST API. Same DB-backed, multi-account pattern
+ * as whatsapp.ts — an admin can add as many named Twilio numbers as
+ * needed in Settings → Integrations. Falls back to a simulated send when
+ * none are configured. Inbound delivery is via the webhook at
+ * /api/webhooks/sms (point each Twilio number's webhook there).
+ */
+
+type TwilioConfig = { accountSid: string; authToken: string; fromNumber: string };
+
+async function getAccount(organizationId: string, accountId?: string) {
+  const account = accountId
+    ? await prisma.integrationAccount.findFirst({
+        where: { id: accountId, organizationId, type: "SMS_TWILIO", status: "CONNECTED" },
+      })
+    : await prisma.integrationAccount.findFirst({
+        where: { organizationId, type: "SMS_TWILIO", status: "CONNECTED" },
+        orderBy: { createdAt: "asc" },
+      });
+  const config = account?.config as Partial<TwilioConfig> | null;
+  if (!config?.accountSid || !config?.authToken || !config?.fromNumber) return null;
+  return { accountSid: config.accountSid, authToken: config.authToken, fromNumber: config.fromNumber };
+}
+
+export async function sendSms(organizationId: string, to: string, body: string, accountId?: string) {
+  const account = await getAccount(organizationId, accountId);
+  if (!account) {
     return { simulated: true as const, externalId: `sim_sms_${Date.now()}` };
   }
 
   try {
     const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${account.accountSid}/Messages.json`,
       {
         method: "POST",
         headers: {
-          Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+          Authorization: `Basic ${Buffer.from(`${account.accountSid}:${account.authToken}`).toString("base64")}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: to, From: from, Body: body }),
+        body: new URLSearchParams({ To: to, From: account.fromNumber, Body: body }),
       }
     );
     if (!res.ok) throw new Error(`Twilio API responded ${res.status}`);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
+import { hasFullLeadVisibility } from "@/lib/access";
 
 const schema = z.object({ completed: z.boolean() });
 
@@ -12,7 +13,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const { orgId, sub } = auth.session;
 
-  const task = await prisma.task.findFirst({ where: { id, organizationId: orgId } });
+  const task = await prisma.task.findFirst({
+    where: {
+      id,
+      organizationId: orgId,
+      ...(hasFullLeadVisibility(auth.session.role) ? {} : { assignedToId: auth.session.sub }),
+    },
+  });
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = schema.safeParse(await req.json().catch(() => null));

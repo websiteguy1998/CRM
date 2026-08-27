@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
+import { leadWhereForSession } from "@/lib/access";
 
 const schema = z.object({ body: z.string().min(1) });
 
@@ -12,7 +13,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const { orgId, sub } = auth.session;
 
-  const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId } });
+  const lead = await prisma.lead.findFirst({
+    where: { id, organizationId: orgId, ...leadWhereForSession(auth.session) },
+  });
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = schema.safeParse(await req.json().catch(() => null));

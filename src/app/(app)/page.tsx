@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import { formatCurrency, relativeTime } from "@/lib/format";
+import { hasFullLeadVisibility, isAdmin, leadWhereForSession } from "@/lib/access";
 import Link from "next/link";
 
 function startOfToday() {
@@ -15,6 +16,8 @@ export default async function DashboardPage() {
   if (!session) return null;
   const orgId = session.orgId;
   const today = startOfToday();
+  const fullAccess = hasFullLeadVisibility(session.role);
+  const leadWhere = leadWhereForSession(session);
 
   const [
     newLeadsToday,
@@ -29,13 +32,15 @@ export default async function DashboardPage() {
     hotLeads,
     recentActivities,
     agents,
+    pendingSignups,
   ] = await Promise.all([
-    prisma.lead.count({ where: { organizationId: orgId, createdAt: { gte: today } } }),
+    prisma.lead.count({ where: { organizationId: orgId, createdAt: { gte: today }, ...leadWhere } }),
     prisma.activity.count({
       where: {
         organizationId: orgId,
         createdAt: { gte: today },
         type: { in: ["MESSAGE_OUTBOUND", "CALL_LOGGED"] },
+        lead: leadWhere,
       },
     }),
     prisma.activity.count({
@@ -43,44 +48,52 @@ export default async function DashboardPage() {
         organizationId: orgId,
         createdAt: { gte: today },
         type: { in: ["MESSAGE_INBOUND", "MESSAGE_OUTBOUND"] },
+        lead: leadWhere,
       },
     }),
-    prisma.call.count({ where: { organizationId: orgId, startedAt: { gte: today } } }),
+    prisma.call.count({ where: { organizationId: orgId, startedAt: { gte: today }, lead: leadWhere } }),
     prisma.task.count({
-      where: { organizationId: orgId, completedAt: null, dueAt: { lte: new Date() } },
+      where: { organizationId: orgId, completedAt: null, dueAt: { lte: new Date() }, lead: leadWhere },
     }),
-    prisma.deal.count({ where: { organizationId: orgId, status: "WON", closedAt: { gte: today } } }),
+    prisma.deal.count({
+      where: { organizationId: orgId, status: "WON", closedAt: { gte: today }, lead: leadWhere },
+    }),
     prisma.deal.aggregate({
-      where: { organizationId: orgId, status: "WON" },
+      where: { organizationId: orgId, status: "WON", lead: leadWhere },
       _sum: { value: true },
     }),
-    prisma.lead.count({ where: { organizationId: orgId, status: "OPEN" } }),
+    prisma.lead.count({ where: { organizationId: orgId, status: "OPEN", ...leadWhere } }),
     prisma.task.findMany({
-      where: { organizationId: orgId, completedAt: null, dueAt: { lt: new Date() } },
+      where: { organizationId: orgId, completedAt: null, dueAt: { lt: new Date() }, lead: leadWhere },
       include: { lead: { include: { contact: true } }, assignedTo: true },
       orderBy: { dueAt: "asc" },
       take: 5,
     }),
     prisma.lead.findMany({
-      where: { organizationId: orgId, status: "OPEN", score: { gte: 70 } },
+      where: { organizationId: orgId, status: "OPEN", score: { gte: 70 }, ...leadWhere },
       include: { contact: true },
       orderBy: { score: "desc" },
       take: 5,
     }),
     prisma.activity.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, lead: leadWhere },
       include: { lead: { include: { contact: true } }, actor: true },
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
-    prisma.user.findMany({
-      where: { organizationId: orgId, role: { in: ["AGENT", "MANAGER"] }, active: true },
-      include: {
-        ownedLeads: { select: { id: true, status: true } },
-        calls: { select: { id: true } },
-        _count: { select: { ownedLeads: true } },
-      },
-    }),
+    fullAccess
+      ? prisma.user.findMany({
+          where: { organizationId: orgId, role: { in: ["AGENT", "MANAGER"] }, active: true },
+          include: {
+            ownedLeads: { select: { id: true, status: true } },
+            calls: { select: { id: true } },
+            _count: { select: { ownedLeads: true } },
+          },
+        })
+      : Promise.resolve([]),
+    isAdmin(session.role)
+      ? prisma.user.count({ where: { organizationId: orgId, active: false } })
+      : Promise.resolve(0),
   ]);
 
   const leaderboard = await Promise.all(
@@ -126,42 +139,52 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="card p-5 lg:col-span-2">
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Sales team leaderboard</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                  <th className="pb-2 font-medium">Agent</th>
-                  <th className="pb-2 font-medium">Leads</th>
-                  <th className="pb-2 font-medium">Calls</th>
-                  <th className="pb-2 font-medium">Deals</th>
-                  <th className="pb-2 font-medium">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2 font-medium text-slate-800">{a.name}</td>
-                    <td className="py-2 text-slate-600">{a.leads}</td>
-                    <td className="py-2 text-slate-600">{a.calls}</td>
-                    <td className="py-2 text-slate-600">{a.deals}</td>
-                    <td className="py-2 text-slate-600">{formatCurrency(a.revenue)}</td>
+          {fullAccess && (
+            <div className="card p-5 lg:col-span-2">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Sales team leaderboard</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                    <th className="pb-2 font-medium">Agent</th>
+                    <th className="pb-2 font-medium">Leads</th>
+                    <th className="pb-2 font-medium">Calls</th>
+                    <th className="pb-2 font-medium">Deals</th>
+                    <th className="pb-2 font-medium">Revenue</th>
                   </tr>
-                ))}
-                {leaderboard.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400">
-                      No agents yet — add some in Settings → Users.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {leaderboard.map((a) => (
+                    <tr key={a.id} className="border-b border-slate-50 last:border-0">
+                      <td className="py-2 font-medium text-slate-800">{a.name}</td>
+                      <td className="py-2 text-slate-600">{a.leads}</td>
+                      <td className="py-2 text-slate-600">{a.calls}</td>
+                      <td className="py-2 text-slate-600">{a.deals}</td>
+                      <td className="py-2 text-slate-600">{formatCurrency(a.revenue)}</td>
+                    </tr>
+                  ))}
+                  {leaderboard.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400">
+                        No agents yet — add some in Settings → Users.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          <div className="card p-5">
+          <div className={`card p-5 ${fullAccess ? "" : "lg:col-span-3"}`}>
             <h2 className="mb-3 text-sm font-semibold text-slate-900">Alerts</h2>
             <ul className="space-y-2 text-sm">
+              {isAdmin(session.role) && pendingSignups > 0 && (
+                <li className="flex items-start gap-2">
+                  <span>🆕</span>
+                  <Link href="/settings/users" className="text-slate-700 hover:underline">
+                    {pendingSignups} account{pendingSignups > 1 ? "s" : ""} waiting for approval
+                  </Link>
+                </li>
+              )}
               {overdueTasks.map((t) => (
                 <li key={t.id} className="flex items-start gap-2">
                   <span>🔴</span>
@@ -178,7 +201,7 @@ export default async function DashboardPage() {
                   </Link>
                 </li>
               ))}
-              {overdueTasks.length === 0 && hotLeads.length === 0 && (
+              {overdueTasks.length === 0 && hotLeads.length === 0 && pendingSignups === 0 && (
                 <li className="text-slate-400">No alerts right now.</li>
               )}
             </ul>

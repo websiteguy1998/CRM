@@ -4,12 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
 import { recalculateLeadScore } from "@/lib/scoring";
+import { leadWhereForSession } from "@/lib/access";
 
 const schema = z.object({ stageId: z.string().min(1) });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
+  if (auth.session.role === "LEAD_ENTRY") {
+    return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
+  }
   const { id } = await params;
   const { orgId, sub } = auth.session;
 
@@ -17,7 +21,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId } });
+  const lead = await prisma.lead.findFirst({
+    where: { id, organizationId: orgId, ...leadWhereForSession(auth.session) },
+  });
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const newStage = await prisma.pipelineStage.findFirst({

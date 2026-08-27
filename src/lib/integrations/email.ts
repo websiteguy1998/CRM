@@ -10,22 +10,24 @@ import { recordInboundMessage } from "@/lib/inbound";
  * standing up a Google Cloud OAuth consent screen, at the cost of only
  * working with Gmail/Google Workspace inboxes that have an app password
  * enabled. Falls back to simulated send when nothing is configured, same
- * as the WhatsApp/SMS integrations.
+ * as the WhatsApp/SMS integrations. Supports multiple connected mailboxes
+ * per org (Settings → Integrations → "+ Add another").
  */
 
 type GmailConfig = { email: string; appPassword: string };
 
-async function getGmailConfig(organizationId: string): Promise<GmailConfig | null> {
-  const account = await prisma.integrationAccount.findFirst({
+async function getGmailConfigs(organizationId: string): Promise<GmailConfig[]> {
+  const accounts = await prisma.integrationAccount.findMany({
     where: { organizationId, type: "GMAIL", status: "CONNECTED" },
+    orderBy: { createdAt: "asc" },
   });
-  const config = account?.config as Partial<GmailConfig> | null;
-  if (!config?.email || !config?.appPassword) return null;
-  return { email: config.email, appPassword: config.appPassword };
+  return accounts
+    .map((a) => a.config as Partial<GmailConfig> | null)
+    .filter((c): c is GmailConfig => Boolean(c?.email && c?.appPassword));
 }
 
 export async function sendEmail(organizationId: string, to: string, subject: string, body: string) {
-  const gmail = await getGmailConfig(organizationId);
+  const [gmail] = await getGmailConfigs(organizationId);
   if (!gmail) {
     return { simulated: true as const, externalId: `sim_email_${Date.now()}` };
   }
@@ -50,16 +52,7 @@ export async function sendEmail(organizationId: string, to: string, subject: str
   }
 }
 
-/**
- * Polls the connected Gmail inbox for unseen mail and records each as an
- * inbound message on the matching (or newly created) lead. There's no
- * inbound webhook for App-Password Gmail, so this is called on demand from
- * a "Check for new emails" button rather than pushed in real time.
- */
-export async function checkGmailInbox(organizationId: string) {
-  const gmail = await getGmailConfig(organizationId);
-  if (!gmail) return { checked: 0, configured: false as const };
-
+async function checkOneInbox(gmail: GmailConfig) {
   const client = new ImapFlow({
     host: "imap.gmail.com",
     port: 993,
@@ -98,6 +91,22 @@ export async function checkGmailInbox(organizationId: string) {
   } finally {
     await client.logout();
   }
+  return checked;
+}
 
+/**
+ * Polls every connected Gmail inbox for unseen mail and records each as an
+ * inbound message on the matching (or newly created) lead. There's no
+ * inbound webhook for App-Password Gmail, so this is called on demand from
+ * a "Check for new emails" button rather than pushed in real time.
+ */
+export async function checkGmailInbox(organizationId: string) {
+  const gmails = await getGmailConfigs(organizationId);
+  if (gmails.length === 0) return { checked: 0, configured: false as const };
+
+  let checked = 0;
+  for (const gmail of gmails) {
+    checked += await checkOneInbox(gmail);
+  }
   return { checked, configured: true as const };
 }

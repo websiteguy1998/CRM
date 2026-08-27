@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getFirstStage } from "@/lib/pipeline";
-import { pickNextAgent } from "@/lib/assignment";
 import { logActivity } from "@/lib/timeline";
 import { recalculateLeadScore } from "@/lib/scoring";
+import { getPrimaryOrganizationId } from "@/lib/org";
 import type { Channel } from "@prisma/client";
 
 /**
@@ -10,13 +10,10 @@ import type { Channel } from "@prisma/client";
  * webhook payload itself (WhatsApp phone_number_id, Twilio account SID, the
  * mailbox that received the email) by matching it against
  * IntegrationAccount.config. This MVP runs a single organization, so it
- * falls back to that when no integration match is found.
+ * falls back to getPrimaryOrganizationId() when no integration match is
+ * found.
  */
-async function resolveOrganizationId() {
-  const org = await prisma.organization.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!org) throw new Error("No organization configured");
-  return org.id;
-}
+const resolveOrganizationId = getPrimaryOrganizationId;
 
 /** Finds the contact/lead a phone or email belongs to, creating both if this is a brand-new inbound contact. */
 async function findOrCreateLeadForContact(params: {
@@ -57,8 +54,9 @@ async function findOrCreateLeadForContact(params: {
     update: {},
     create: { organizationId, name: inboundSourceName },
   });
-  const ownerId = await pickNextAgent(organizationId);
 
+  // Left unassigned on purpose — a Super Admin manually allocates every
+  // lead to a sales agent (see Lead.ownerId / the allocate action).
   const lead = await prisma.lead.create({
     data: {
       organizationId,
@@ -66,7 +64,6 @@ async function findOrCreateLeadForContact(params: {
       pipelineId: pipeline.id,
       stageId: stage.id,
       sourceId: source.id,
-      ownerId: ownerId ?? undefined,
     },
   });
 

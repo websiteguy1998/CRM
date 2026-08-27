@@ -41,6 +41,7 @@ enum Role {
   AGENT
   QA
   MARKETING
+  LEAD_ENTRY
 }
 
 model User {
@@ -51,17 +52,33 @@ model User {
   email          String   @unique
   passwordHash   String
   role           Role     @default(AGENT)
+  // false = pending admin approval (self-signups start here); an
+  // admin-created user (Settings -> Add user) starts true.
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
   teamMemberships TeamMember[]
   ownedLeads      Lead[]        @relation("LeadOwner")
+  createdLeads    Lead[]        @relation("LeadCreatedBy")
   assignedTasks   Task[]        @relation("TaskAssignee")
   calls           Call[]
   notes           Note[]
   activities      Activity[]
   stageChanges    LeadStageHistory[]
   sentMessages    Message[]
+}
+
+// Short-lived email verification code for the public signup flow. Not
+// tied to a User row yet since the account isn't created until the code
+// is confirmed.
+model SignupVerification {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }
 
 model Team {
@@ -197,9 +214,23 @@ model Lead {
   stage          PipelineStage @relation(fields: [stageId], references: [id])
   ownerId        String?
   owner          User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  createdById    String?
+  createdBy      User?        @relation("LeadCreatedBy", fields: [createdById], references: [id])
   status         LeadStatus   @default(OPEN)
   score          Int          @default(0)
   scoreReasons   Json?
+
+  // Sheet-style fields (id name/url = the client's profile on the
+  // platform they were found on, e.g. a Fiverr username + link).
+  idName        String?
+  idUrl         String?
+  websiteUrl    String?
+  country       String?
+  deliveryDate  DateTime?
+  price         Decimal?  @db.Decimal(12, 2)
+  duration      String?
+  statusNote    String?
+
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   lastActivityAt DateTime     @default(now())
@@ -215,6 +246,8 @@ model Lead {
 
   @@index([organizationId, stageId])
   @@index([organizationId, ownerId])
+  @@index([organizationId, createdById, createdAt])
+  @@index([organizationId, websiteUrl])
 }
 
 model LeadStageHistory {

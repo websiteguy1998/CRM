@@ -3,8 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { getFirstStage } from "@/lib/pipeline";
-import { pickNextAgent } from "@/lib/assignment";
 import { logActivity } from "@/lib/timeline";
+import { leadWhereForSession, isAdmin } from "@/lib/access";
+import { findDuplicateLead } from "@/lib/duplicate-lead";
 
 export async function GET(req: NextRequest) {
   const auth = await requireApiSession();
@@ -19,18 +20,25 @@ export async function GET(req: NextRequest) {
   const leads = await prisma.lead.findMany({
     where: {
       organizationId: orgId,
+      ...leadWhereForSession(auth.session),
       ...(stageId ? { stageId } : {}),
-      ...(ownerId ? { ownerId } : {}),
+      ...(ownerId && isAdmin(auth.session.role) ? { ownerId } : {}),
       ...(search
         ? {
-            contact: {
-              OR: [
-                { firstName: { contains: search, mode: "insensitive" } },
-                { lastName: { contains: search, mode: "insensitive" } },
-                { email: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search, mode: "insensitive" } },
-              ],
-            },
+            OR: [
+              { idName: { contains: search, mode: "insensitive" } },
+              { websiteUrl: { contains: search, mode: "insensitive" } },
+              {
+                contact: {
+                  OR: [
+                    { firstName: { contains: search, mode: "insensitive" } },
+                    { lastName: { contains: search, mode: "insensitive" } },
+                    { email: { contains: search, mode: "insensitive" } },
+                    { phone: { contains: search, mode: "insensitive" } },
+                  ],
+                },
+              },
+            ],
           }
         : {}),
     },
@@ -40,6 +48,7 @@ export async function GET(req: NextRequest) {
       stage: true,
       owner: true,
       source: true,
+      createdBy: true,
     },
     orderBy: { lastActivityAt: "desc" },
     take: 200,
@@ -49,18 +58,27 @@ export async function GET(req: NextRequest) {
 }
 
 const createLeadSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  clientName: z.string().min(1),
+  idName: z.string().optional(),
+  idUrl: z.string().optional(),
+  country: z.string().optional(),
+  websiteUrl: z.string().optional(),
   phone: z.string().optional(),
-  companyName: z.string().optional(),
-  sourceName: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  deliveryDate: z.string().optional(),
+  price: z.coerce.number().optional(),
+  duration: z.string().optional(),
+  statusNote: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
-  const { orgId } = auth.session;
+  const { orgId, sub, role } = auth.session;
+
+  if (role !== "ADMIN" && role !== "LEAD_ENTRY") {
+    return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => null);
   const parsed = createLeadSchema.safeParse(body);
@@ -69,47 +87,50 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
+  const duplicate = await findDuplicateLead(orgId, {
+    phone: data.phone,
+    email: data.email || undefined,
+    websiteUrl: data.websiteUrl,
+    idUrl: data.idUrl,
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      {
+        error: "This lead is already registered in the system.",
+        duplicateLeadId: duplicate.id,
+      },
+      { status: 409 }
+    );
+  }
+
   const { pipeline, stage } = await getFirstStage(orgId);
-
-  const company = data.companyName
-    ? (await prisma.company.findFirst({
-        where: { organizationId: orgId, name: data.companyName },
-      })) ??
-      (await prisma.company.create({
-        data: { organizationId: orgId, name: data.companyName },
-      }))
-    : null;
-
-  const source = data.sourceName
-    ? await prisma.leadSource.upsert({
-        where: { organizationId_name: { organizationId: orgId, name: data.sourceName } },
-        update: {},
-        create: { organizationId: orgId, name: data.sourceName },
-      })
-    : null;
 
   const contact = await prisma.contact.create({
     data: {
       organizationId: orgId,
-      firstName: data.firstName,
-      lastName: data.lastName,
+      firstName: data.clientName,
       email: data.email || undefined,
       phone: data.phone,
-      companyId: company?.id,
     },
   });
 
-  const ownerId = await pickNextAgent(orgId);
-
+  // Left unassigned on purpose — a Super Admin allocates it to a sales
+  // agent afterwards (Leads list / lead detail "Owner" field, admin-only).
   const lead = await prisma.lead.create({
     data: {
       organizationId: orgId,
       contactId: contact.id,
-      companyId: company?.id,
-      sourceId: source?.id,
       pipelineId: pipeline.id,
       stageId: stage.id,
-      ownerId: ownerId ?? undefined,
+      createdById: sub,
+      idName: data.idName,
+      idUrl: data.idUrl,
+      country: data.country,
+      websiteUrl: data.websiteUrl,
+      deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
+      price: data.price,
+      duration: data.duration,
+      statusNote: data.statusNote,
     },
     include: { contact: true, stage: true, owner: true },
   });
@@ -119,15 +140,8 @@ export async function POST(req: NextRequest) {
     leadId: lead.id,
     type: "LEAD_CREATED",
     summary: "Lead created",
+    actorId: sub,
   });
-  if (ownerId) {
-    await logActivity({
-      organizationId: orgId,
-      leadId: lead.id,
-      type: "LEAD_ASSIGNED",
-      summary: `Assigned to ${lead.owner?.name}`,
-    });
-  }
 
   return NextResponse.json({ lead }, { status: 201 });
 }

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import { formatDateTime } from "@/lib/format";
+import { leadWhereForSession } from "@/lib/access";
 
 const STATUS_COLOR: Record<string, string> = {
   ANSWERED: "bg-emerald-100 text-emerald-700",
@@ -16,7 +17,7 @@ export default async function CallsPage() {
   if (!session) return null;
 
   const calls = await prisma.call.findMany({
-    where: { organizationId: session.orgId },
+    where: { organizationId: session.orgId, lead: leadWhereForSession(session) },
     include: { lead: { include: { contact: true } }, agent: true },
     orderBy: { startedAt: "desc" },
     take: 200,

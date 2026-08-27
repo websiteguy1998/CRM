@@ -34,13 +34,30 @@ npm run dev
 ```
 
 Sign in at `http://localhost:3000/login` with `admin@unifycrm.dev` /
-`password123` (also `sarah@`, `mike@`, `john@unifycrm.dev`, same password).
+`password123` (also `sarah@`, `mike@`, `john@unifycrm.dev` as sales
+agents, and `priya.entry@unifycrm.dev` as a Lead Entry user — same
+password for all).
 
 ## What's implemented
 
-- **Leads** — list/filter, manual create, CSV import (dedupe by phone/email,
-  auto-normalizes phone, auto-creates company/source/campaign), round-robin
-  auto-assignment
+- **Leads** — sheet-style fields (ID name/URL, client name, country,
+  website, phone/email, delivery date, price, duration, status note),
+  manual create, CSV import matching those same columns, duplicate
+  detection on phone/email/website before a lead is created
+- **Roles & allocation** — Super Admin (everything), Lead Entry (can only
+  add leads — no pipeline/inbox/calls/reports/settings), Sales Agent (only
+  leads a Super Admin has allocated to them, plus calls/WhatsApp/SMS/email
+  on those leads), Manager/QA/Marketing (org-wide visibility). New leads
+  come in **unassigned** — a Super Admin allocates each one to an agent
+  from the Leads list or a lead's detail page. A Lead Entry user's own
+  leads drop out of their view **24 hours** after they added them (Admins
+  always see everything, with filters by date, who entered it, and who
+  it's allocated to)
+- **Signup & approval** — `/signup`: email → a 6-digit verification code →
+  set a password and pick a role → account is created **inactive**. A
+  Super Admin sees it under Settings → Users → Pending approval (also
+  flagged on their dashboard) and must approve it before that person can
+  log in
 - **Pipeline** — drag-and-drop kanban across configurable stages (New →
   Contacted → Interested → Follow-up → Won/Lost), stage history log
 - **Lead profile** — the golden record: one contact, one unified activity
@@ -57,8 +74,9 @@ Sign in at `http://localhost:3000/login` with `admin@unifycrm.dev` /
   alerts, recent activity feed
 - **Reports** — revenue/conversion, per-agent performance, leads by source,
   pipeline distribution, channel response rates
-- **Settings** — users & roles (Admin/Manager/Agent/QA/Marketing), message
-  templates, integration credential forms
+- **Settings** — users & roles, pending-signup approval, message templates,
+  and multi-account integrations (add as many WhatsApp numbers / Gmail
+  mailboxes / Twilio numbers as you use, each under its own label)
 - **Lead scoring** — a rule-based 0–100 score (reply activity, answered
   calls, call duration, pricing questions, stage) that recalculates after
   every message/call/stage change. It's a deterministic stand-in for the
@@ -68,20 +86,26 @@ Sign in at `http://localhost:3000/login` with `admin@unifycrm.dev` /
 ## Connecting real channels
 
 Every send/receive path already exists; only the credentials are missing.
-Until you add them, sends are **simulated** (logged to the timeline,
-clearly marked) so the whole app works in a demo before any integration is
-connected.
+Until you add at least one account, sends are **simulated** (logged to the
+timeline, clearly marked) so the whole app works in a demo before any
+integration is connected. WhatsApp, SMS, and Gmail all support **multiple
+named accounts** — add one entry per number/mailbox in Settings →
+Integrations, no code changes needed.
 
-| Channel | Send | Receive (webhook) | Where to configure |
+| Channel | Send | Receive | Where to configure |
 |---|---|---|---|
-| WhatsApp | `src/lib/integrations/whatsapp.ts` → Meta Cloud API | `POST /api/webhooks/whatsapp` (Meta calls this) | Settings → Integrations, or `WHATSAPP_*` env vars |
-| SMS | `src/lib/integrations/sms.ts` → Twilio | `POST /api/webhooks/sms` (Twilio calls this) | Settings → Integrations, or `TWILIO_*` env vars |
-| Email | `src/lib/integrations/email.ts` (simulated only) | `POST /api/webhooks/email` (generic relay) | Needs an OAuth connect flow (Gmail/Graph) — see comments in that file for the missing piece |
-| Zoom Phone | Call logging exists; click-to-call/recordings need the Zoom API | — | Settings → Integrations, or `ZOOM_*` env vars |
+| WhatsApp | `src/lib/integrations/whatsapp.ts` → Meta Cloud API | `POST /api/webhooks/whatsapp` (Meta calls this) | Settings → Integrations → "+ Add another" |
+| SMS | `src/lib/integrations/sms.ts` → Twilio | `POST /api/webhooks/sms` (Twilio calls this) | Settings → Integrations → "+ Add another" |
+| Email (Gmail) | `src/lib/integrations/email.ts` → SMTP via an app password | "Check for new emails now" button (polls IMAP — there's no push webhook for app-password Gmail) | Settings → Integrations → "+ Add another" |
+| Zoom Phone | Call logging exists; click-to-call/recordings need the Zoom API | — | Settings → Integrations |
 
 Point your WhatsApp Business app's webhook at
-`https://<your-domain>/api/webhooks/whatsapp` and your Twilio number's
+`https://<your-domain>/api/webhooks/whatsapp` and each Twilio number's
 "a message comes in" webhook at `https://<your-domain>/api/webhooks/sms`.
+All connected WhatsApp/Twilio numbers share those same two webhook URLs
+(that's how both platforms' webhooks work — one subscription covers every
+number under the account); outbound sends use the first connected account
+of that type unless the app is extended to let an agent pick one.
 
 ## Data model
 

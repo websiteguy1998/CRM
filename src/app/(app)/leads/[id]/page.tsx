@@ -7,7 +7,9 @@ import ScoreBadge from "@/components/score-badge";
 import StageSelector from "@/components/stage-selector";
 import OwnerSelector from "@/components/owner-selector";
 import LeadActions from "@/components/lead-actions";
+import LeadDetailsEditor from "@/components/lead-details-editor";
 import { formatDateTime, relativeTime } from "@/lib/format";
+import { isAdmin, leadWhereForSession } from "@/lib/access";
 import type { ActivityType } from "@prisma/client";
 
 const ACTIVITY_ICON: Record<ActivityType, string> = {
@@ -28,10 +30,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const session = await getSession();
   if (!session) return null;
   const { id } = await params;
+  const admin = isAdmin(session.role);
+  const entryOnly = session.role === "LEAD_ENTRY";
 
   const [lead, owners] = await Promise.all([
     prisma.lead.findFirst({
-      where: { id, organizationId: session.orgId },
+      where: { id, organizationId: session.orgId, ...leadWhereForSession(session) },
       include: {
         contact: true,
         company: true,
@@ -72,15 +76,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
               <div>
                 <p className="label mb-1">Stage</p>
-                <StageSelector leadId={lead.id} stages={lead.pipeline.stages} currentStageId={lead.stageId} />
+                {entryOnly ? (
+                  <p className="input flex items-center bg-slate-50 text-slate-500">{lead.stage.name}</p>
+                ) : (
+                  <StageSelector leadId={lead.id} stages={lead.pipeline.stages} currentStageId={lead.stageId} />
+                )}
               </div>
               <div>
                 <p className="label mb-1">Owner</p>
-                <OwnerSelector
-                  leadId={lead.id}
-                  owners={owners.map((o) => ({ id: o.id, name: o.name }))}
-                  currentOwnerId={lead.ownerId}
-                />
+                {admin ? (
+                  <OwnerSelector
+                    leadId={lead.id}
+                    owners={owners.map((o) => ({ id: o.id, name: o.name }))}
+                    currentOwnerId={lead.ownerId}
+                  />
+                ) : (
+                  <p className="input flex items-center bg-slate-50 text-slate-500">
+                    {lead.owner?.name ?? "Unassigned"}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="label mb-1">Source / campaign</p>
@@ -122,10 +136,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </div>
 
         <div className="space-y-6">
-          <LeadActions
+          {!entryOnly && (
+            <LeadActions
+              leadId={lead.id}
+              hasPhone={Boolean(lead.contact.phone)}
+              hasEmail={Boolean(lead.contact.email)}
+            />
+          )}
+
+          <LeadDetailsEditor
             leadId={lead.id}
-            hasPhone={Boolean(lead.contact.phone)}
-            hasEmail={Boolean(lead.contact.email)}
+            editable={admin || entryOnly}
+            details={{
+              idName: lead.idName,
+              idUrl: lead.idUrl,
+              country: lead.country,
+              websiteUrl: lead.websiteUrl,
+              deliveryDate: lead.deliveryDate ? lead.deliveryDate.toISOString() : null,
+              price: lead.price != null ? String(lead.price) : null,
+              duration: lead.duration,
+              statusNote: lead.statusNote,
+            }}
           />
 
           <div className="card p-4">

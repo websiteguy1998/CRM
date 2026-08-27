@@ -1,13 +1,13 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import IntegrationForm from "./integration-form";
+import IntegrationTypeCard from "./integration-type-card";
 
 const TYPES = [
   {
     type: "WHATSAPP" as const,
     title: "WhatsApp Business Platform",
-    description: "Meta Cloud API — send/receive WhatsApp messages from the CRM.",
+    description: "Meta Cloud API — add one entry per WhatsApp number you send from.",
   },
   {
     type: "ZOOM_PHONE" as const,
@@ -17,7 +17,7 @@ const TYPES = [
   {
     type: "GMAIL" as const,
     title: "Gmail / Google Workspace",
-    description: "OAuth app for sending and syncing email threads.",
+    description: "App password auth — add one entry per mailbox.",
   },
   {
     type: "MICROSOFT_365" as const,
@@ -37,22 +37,25 @@ export default async function IntegrationsSettingsPage() {
 
   const integrations = await prisma.integrationAccount.findMany({
     where: { organizationId: session.orgId },
+    orderBy: { createdAt: "asc" },
   });
 
   return (
     <div>
       <PageHeader
         title="Integrations"
-        description="Connect official APIs — messages keep working in simulated mode until you do."
+        description="Add as many numbers/mailboxes as you use — messages keep working in simulated mode until at least one is connected."
       />
       <div className="space-y-4 p-6">
         {TYPES.map((t) => (
-          <IntegrationForm
+          <IntegrationTypeCard
             key={t.type}
             type={t.type}
             title={t.title}
             description={t.description}
-            status={integrations.find((i) => i.type === t.type)?.status ?? "NOT_CONFIGURED"}
+            accounts={integrations
+              .filter((i) => i.type === t.type && i.status === "CONNECTED")
+              .map((i) => ({ id: i.id, name: i.name, status: i.status }))}
           />
         ))}
       </div>

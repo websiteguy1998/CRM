@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
+import { leadWhereForSession } from "@/lib/access";
 
 export async function GET(req: NextRequest) {
   const auth = await requireApiSession();
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
   const conversations = await prisma.conversation.findMany({
     where: {
       organizationId: orgId,
+      lead: leadWhereForSession(auth.session),
       ...(channel ? { channel: channel as "WHATSAPP" | "SMS" | "EMAIL" } : {}),
     },
     include: {

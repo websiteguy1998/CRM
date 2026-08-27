@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import TaskCheckbox from "@/components/task-checkbox";
 import { formatDateTime } from "@/lib/format";
+import { hasFullLeadVisibility } from "@/lib/access";
 
 const TYPE_ICON: Record<string, string> = {
   CALL: "📞",
@@ -22,7 +23,10 @@ export default async function TasksPage() {
   endOfToday.setHours(23, 59, 59, 999);
 
   const tasks = await prisma.task.findMany({
-    where: { organizationId: session.orgId },
+    where: {
+      organizationId: session.orgId,
+      ...(hasFullLeadVisibility(session.role) ? {} : { assignedToId: session.sub }),
+    },
     include: { lead: { include: { contact: true } }, assignedTo: true },
     orderBy: { dueAt: "asc" },
     take: 300,

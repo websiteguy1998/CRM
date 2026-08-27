@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/auth";
+import { canAccess } from "@/lib/access";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: "🏠" },
@@ -18,6 +19,7 @@ const NAV = [
 export default function Sidebar({ session }: { session: SessionPayload }) {
   const pathname = usePathname();
   const router = useRouter();
+  const visibleNav = NAV.filter((item) => canAccess(session.role, item.href));
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -34,7 +36,7 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
         <span className="text-sm font-semibold text-slate-900">Unify CRM</span>
       </div>
       <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.map((item) => {
+        {visibleNav.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link

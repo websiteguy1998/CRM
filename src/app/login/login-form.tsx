@@ -68,6 +68,12 @@ export default function LoginForm() {
       <button type="submit" disabled={loading} className="btn-primary w-full">
         {loading ? "Signing in…" : "Sign in"}
       </button>
+      <p className="text-center text-xs text-slate-400">
+        New here?{" "}
+        <a href="/signup" className="text-indigo-600 hover:underline">
+          Create an account
+        </a>
+      </p>
     </form>
   );
 }

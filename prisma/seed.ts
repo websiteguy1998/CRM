@@ -19,7 +19,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("password123", 10);
 
-  const [admin, sarah, mike, john] = await Promise.all([
+  const [admin, sarah, mike, john, priyaEntry] = await Promise.all([
     prisma.user.create({
       data: { organizationId: org.id, name: "Alex Admin", email: "admin@unifycrm.dev", passwordHash, role: "ADMIN" },
     }),
@@ -31,6 +31,9 @@ async function main() {
     }),
     prisma.user.create({
       data: { organizationId: org.id, name: "John Smith", email: "john@unifycrm.dev", passwordHash, role: "MANAGER" },
+    }),
+    prisma.user.create({
+      data: { organizationId: org.id, name: "Priya Entry", email: "priya.entry@unifycrm.dev", passwordHash, role: "LEAD_ENTRY" },
     }),
   ]);
   const agents = [sarah, mike, john];
@@ -84,10 +87,10 @@ async function main() {
   );
 
   const leadSeeds = [
-    { first: "John", last: "Smith", phone: "+15551230001", email: "john.smith@abccompany.com", company: 0, source: googleAds, campaign: campaignA, stage: stageInterested, owner: sarah, score: 87 },
-    { first: "Priya", last: "Patel", phone: "+15551230002", email: "priya@brightretail.com", company: 1, source: facebookAds, campaign: campaignB, stage: stageContacted, owner: mike, score: 55 },
+    { first: "John", last: "Smith", phone: "+15551230001", email: "john.smith@abccompany.com", company: 0, source: googleAds, campaign: campaignA, stage: stageInterested, owner: sarah, score: 87, websiteUrl: "abccompany.com", country: "United States", price: 8500, duration: "3 weeks", statusNote: "Text on WhatsApp (Sarah)" },
+    { first: "Priya", last: "Patel", phone: "+15551230002", email: "priya@brightretail.com", company: 1, source: facebookAds, campaign: campaignB, stage: stageContacted, owner: mike, score: 55, websiteUrl: "brightretail.com", country: "United Kingdom" },
     { first: "Diego", last: "Alvarez", phone: "+15551230003", email: "diego@northwind.com", company: 2, source: referral, stage: stageNew, owner: john, score: 20 },
-    { first: "Mia", last: "Wong", phone: "+15551230004", email: "mia@acmelogistics.com", company: 3, source: website, stage: stageFollowUp, owner: sarah, score: 72 },
+    { first: "Mia", last: "Wong", phone: "+15551230004", email: "mia@acmelogistics.com", company: 3, source: website, stage: stageFollowUp, owner: sarah, score: 72, deliveryDate: "future" },
     { first: "Sam", last: "Okafor", phone: "+15551230005", email: "sam@blueocean.com", company: 4, source: googleAds, campaign: campaignA, stage: stageWon, owner: mike, score: 100 },
     { first: "Grace", last: "Kim", phone: "+15551230006", email: "grace@abccompany.com", company: 0, source: referral, stage: stageLost, owner: john, score: 0 },
     { first: "Tom", last: "Reilly", phone: "+15551230007", email: "tom@brightretail.com", company: 1, source: website, stage: stageNew, owner: sarah, score: 25 },
@@ -117,9 +120,16 @@ async function main() {
         pipelineId: pipeline.id,
         stageId: seed.stage.id,
         ownerId: seed.owner.id,
+        createdById: admin.id,
         status: seed.stage.isWon ? "WON" : seed.stage.isLost ? "LOST" : "OPEN",
         score: seed.score,
         scoreReasons: ["Seeded demo data"],
+        websiteUrl: seed.websiteUrl,
+        country: seed.country,
+        price: seed.price,
+        duration: seed.duration,
+        statusNote: seed.statusNote,
+        deliveryDate: seed.deliveryDate ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : undefined,
       },
     });
 
@@ -207,8 +217,38 @@ async function main() {
     i += 1;
   }
 
-  console.log(`Seeded org ${org.id} with ${agents.length + 1} users and ${leadSeeds.length} leads.`);
-  console.log("Login with admin@unifycrm.dev / password123 (or sarah/mike/john@unifycrm.dev).");
+  // A couple of unassigned leads entered by the LEAD_ENTRY demo user, so
+  // the "pending allocation" and 24h-visibility behavior has something to
+  // show without any manual steps.
+  const entrySeeds = [
+    { first: "Noah Bennett", phone: "+15551239001", email: "noah@driftwoodstudio.com", idName: "driftwood_studio", idUrl: "https://fiverr.com/driftwood_studio", websiteUrl: "driftwoodstudio.com", country: "Canada", statusNote: "New lead, not contacted yet" },
+    { first: "Layla Haddad", phone: "+15551239002", email: "layla@haddadconsulting.com", idName: "layla.h", idUrl: "https://upwork.com/freelancers/layla-h", websiteUrl: "haddadconsulting.com", country: "United Arab Emirates", statusNote: "Vm" },
+  ];
+  for (const seed of entrySeeds) {
+    const contact = await prisma.contact.create({
+      data: { organizationId: org.id, firstName: seed.first, email: seed.email, phone: seed.phone },
+    });
+    const lead = await prisma.lead.create({
+      data: {
+        organizationId: org.id,
+        contactId: contact.id,
+        pipelineId: pipeline.id,
+        stageId: stageNew.id,
+        createdById: priyaEntry.id,
+        idName: seed.idName,
+        idUrl: seed.idUrl,
+        websiteUrl: seed.websiteUrl,
+        country: seed.country,
+        statusNote: seed.statusNote,
+      },
+    });
+    await prisma.activity.create({
+      data: { organizationId: org.id, leadId: lead.id, type: "LEAD_CREATED", summary: "Lead created", actorId: priyaEntry.id },
+    });
+  }
+
+  console.log(`Seeded org ${org.id} with ${agents.length + 2} users and ${leadSeeds.length + entrySeeds.length} leads.`);
+  console.log("Login with admin@unifycrm.dev / password123 (or sarah/mike/john/priya.entry@unifycrm.dev).");
 }
 
 main()

@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import PipelineBoard from "./pipeline-board";
+import { leadWhereForSession } from "@/lib/access";
 
 export default async function PipelinePage() {
   const session = await getSession();
@@ -14,7 +15,7 @@ export default async function PipelinePage() {
         orderBy: { order: "asc" },
         include: {
           leads: {
-            where: { organizationId: session.orgId },
+            where: { organizationId: session.orgId, ...leadWhereForSession(session) },
             include: { contact: true, company: true, owner: true, deals: true },
             orderBy: { lastActivityAt: "desc" },
           },

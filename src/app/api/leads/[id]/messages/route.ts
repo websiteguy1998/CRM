@@ -8,6 +8,7 @@ import { sendWhatsAppMessage } from "@/lib/integrations/whatsapp";
 import { sendSms } from "@/lib/integrations/sms";
 import { sendEmail } from "@/lib/integrations/email";
 import { channelIcon } from "@/lib/format";
+import { leadWhereForSession } from "@/lib/access";
 
 const schema = z.object({
   channel: z.enum(["WHATSAPP", "SMS", "EMAIL"]),
@@ -18,11 +19,14 @@ const schema = z.object({
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
+  if (auth.session.role === "LEAD_ENTRY") {
+    return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
+  }
   const { id } = await params;
   const { orgId, sub } = auth.session;
 
   const lead = await prisma.lead.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, ...leadWhereForSession(auth.session) },
     include: { contact: true },
   });
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -51,9 +55,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const dispatch =
     channel === "WHATSAPP"
-      ? sendWhatsAppMessage(destination, body)
+      ? sendWhatsAppMessage(orgId, destination, body)
       : channel === "SMS"
-      ? sendSms(destination, body)
+      ? sendSms(orgId, destination, body)
       : sendEmail(orgId, destination, subject ?? "", body);
   const result = await dispatch;
 
