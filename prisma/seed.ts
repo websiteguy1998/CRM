@@ -4,6 +4,15 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Safe to run on every deploy (e.g. as part of a Vercel build command):
+  // skip re-seeding if demo data already exists instead of erroring on
+  // duplicate emails.
+  const alreadySeeded = await prisma.organization.findFirst();
+  if (alreadySeeded) {
+    console.log("Demo data already present, skipping seed.");
+    return;
+  }
+
   const org = await prisma.organization.create({
     data: { name: "Unify CRM Demo" },
   });
