@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import AddUserForm from "./add-user-form";
 import ApprovalActions from "./approval-actions";
+import EditUserDialog from "./edit-user-dialog";
 import { relativeTime } from "@/lib/format";
 
 export default async function UsersSettingsPage() {
@@ -57,6 +58,7 @@ export default async function UsersSettingsPage() {
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Role</th>
                 <th className="px-4 py-2 font-medium">Status</th>
+                {session.role === "ADMIN" && <th className="px-4 py-2 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -68,6 +70,11 @@ export default async function UsersSettingsPage() {
                   <td className="px-4 py-2.5">
                     <span className="badge bg-emerald-100 text-emerald-700">Active</span>
                   </td>
+                  {session.role === "ADMIN" && (
+                    <td className="px-4 py-2.5">
+                      <EditUserDialog userId={u.id} name={u.name} email={u.email} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

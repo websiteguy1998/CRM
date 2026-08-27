@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
+import { hashPassword } from "@/lib/password";
 
 const schema = z.object({
   active: z.boolean().optional(),
   role: z.enum(["ADMIN", "MANAGER", "AGENT", "QA", "MARKETING", "LEAD_ENTRY"]).optional(),
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(8).optional(),
 });
 
-/** Admin-only: approve/reject a pending signup, or change a user's role/active state. */
+/** Admin-only: approve/reject a pending signup, edit a user's profile, or change role/active state. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
@@ -22,10 +26,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const { password, email, ...rest } = parsed.data;
+
+  if (email && email.toLowerCase() !== user.email) {
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+  }
 
   const updated = await prisma.user.update({
     where: { id },
-    data: parsed.data,
+    data: {
+      ...rest,
+      ...(email ? { email: email.toLowerCase() } : {}),
+      ...(password ? { passwordHash: await hashPassword(password) } : {}),
+    },
     select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
   });
 
