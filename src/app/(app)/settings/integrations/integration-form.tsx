@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CheckEmailButton from "./check-email-button";
 
 type FieldDef = { key: string; label: string; placeholder?: string };
 
@@ -17,8 +18,8 @@ const FIELDS: Record<string, FieldDef[]> = {
     { key: "clientSecret", label: "Client secret" },
   ],
   GMAIL: [
-    { key: "clientId", label: "OAuth client ID" },
-    { key: "clientSecret", label: "OAuth client secret" },
+    { key: "email", label: "Gmail address", placeholder: "you@gmail.com" },
+    { key: "appPassword", label: "App password", placeholder: "16-character app password" },
   ],
   MICROSOFT_365: [
     { key: "clientId", label: "OAuth client ID" },
@@ -80,11 +81,30 @@ export default function IntegrationForm({
           {status === "CONNECTED" ? "Connected" : "Not configured"}
         </span>
       </div>
+      {type === "GMAIL" && (
+        <p className="mb-3 text-xs text-slate-400">
+          Needs 2-Step Verification turned on for the Gmail account, then an{" "}
+          <a
+            href="https://myaccount.google.com/apppasswords"
+            target="_blank"
+            rel="noreferrer"
+            className="text-indigo-600 hover:underline"
+          >
+            App Password
+          </a>{" "}
+          generated there (not your normal Gmail password).
+        </p>
+      )}
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {FIELDS[type].map((f) => (
           <div key={f.key}>
             <label className="label">{f.label}</label>
-            <input name={f.key} className="input" placeholder={f.placeholder} />
+            <input
+              name={f.key}
+              type={f.key === "appPassword" ? "password" : "text"}
+              className="input"
+              placeholder={f.placeholder}
+            />
           </div>
         ))}
         <div className="flex items-end gap-2">
@@ -94,6 +114,11 @@ export default function IntegrationForm({
           {saved && <span className="text-xs text-emerald-600">Saved</span>}
         </div>
       </form>
+      {type === "GMAIL" && status === "CONNECTED" && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <CheckEmailButton />
+        </div>
+      )}
     </div>
   );
 }
