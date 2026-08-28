@@ -196,6 +196,14 @@ enum LeadStatus {
   NURTURE
 }
 
+enum LeadCategory {
+  WEB_DEVELOPMENT
+  GRAPHIC_DESIGN
+  UI_DESIGN
+  SEO
+  SMM
+}
+
 model Lead {
   id             String       @id @default(cuid())
   organizationId String
@@ -230,6 +238,7 @@ model Lead {
   price         Decimal?  @db.Decimal(12, 2)
   duration      String?
   statusNote    String?
+  category      LeadCategory?
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

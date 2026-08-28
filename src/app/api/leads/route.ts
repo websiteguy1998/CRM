@@ -69,6 +69,7 @@ const createLeadSchema = z.object({
   price: z.coerce.number().optional(),
   duration: z.string().optional(),
   statusNote: z.string().optional(),
+  category: z.enum(["WEB_DEVELOPMENT", "GRAPHIC_DESIGN", "UI_DESIGN", "SEO", "SMM"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
   const websiteUrl = normalizeIdentifyingField(data.websiteUrl);
   const idUrl = normalizeIdentifyingField(data.idUrl);
 
-  const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl, idUrl });
+  const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl });
   if (duplicate) {
     return NextResponse.json(
       {
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
       price: data.price,
       duration: data.duration,
       statusNote: data.statusNote,
+      category: data.category,
     },
     include: { contact: true, stage: true, owner: true },
   });

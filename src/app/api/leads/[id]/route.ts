@@ -40,6 +40,7 @@ const patchSchema = z.object({
   price: z.coerce.number().optional(),
   duration: z.string().optional(),
   statusNote: z.string().optional(),
+  category: z.enum(["WEB_DEVELOPMENT", "GRAPHIC_DESIGN", "UI_DESIGN", "SEO", "SMM"]).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -5,6 +5,7 @@ import { requireApiSession } from "@/lib/api-auth";
 import { getFirstStage } from "@/lib/pipeline";
 import { logActivity } from "@/lib/timeline";
 import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
+import type { LeadCategoryValue } from "@/lib/categories";
 
 const HEADER_ALIASES: Record<string, string> = {
   "id name": "idName",
@@ -28,7 +29,30 @@ const HEADER_ALIASES: Record<string, string> = {
   status: "statusNote",
   price: "price",
   duration: "duration",
+  category: "category",
+  service: "category",
 };
+
+const CATEGORY_ALIASES: Record<string, LeadCategoryValue> = {
+  "web development": "WEB_DEVELOPMENT",
+  "web dev": "WEB_DEVELOPMENT",
+  webdev: "WEB_DEVELOPMENT",
+  "graphic design": "GRAPHIC_DESIGN",
+  graphicdesign: "GRAPHIC_DESIGN",
+  "ui design": "UI_DESIGN",
+  "ui/ux": "UI_DESIGN",
+  "ui ux": "UI_DESIGN",
+  uiux: "UI_DESIGN",
+  seo: "SEO",
+  smm: "SMM",
+  "social media marketing": "SMM",
+};
+
+function parseCategory(value: string | undefined): LeadCategoryValue | undefined {
+  const key = value?.trim().toLowerCase();
+  if (!key) return undefined;
+  return CATEGORY_ALIASES[key];
+}
 
 function normalizeHeader(h: string) {
   return h.trim().toLowerCase();
@@ -99,7 +123,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl, idUrl });
+    const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl });
     if (duplicate) {
       duplicates += 1;
       continue;
@@ -129,6 +153,7 @@ export async function POST(req: NextRequest) {
         price: row.price ? Number(row.price) || undefined : undefined,
         duration: row.duration || undefined,
         statusNote: row.statusNote || undefined,
+        category: parseCategory(row.category),
       },
     });
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS, type LeadCategoryValue } from "@/lib/categories";
 
 type LeadDetails = {
   idName: string | null;
@@ -12,6 +13,7 @@ type LeadDetails = {
   price: string | null;
   duration: string | null;
   statusNote: string | null;
+  category: LeadCategoryValue | null;
 };
 
 export default function LeadDetailsEditor({
@@ -44,6 +46,7 @@ export default function LeadDetailsEditor({
           price: form.get("price") || undefined,
           duration: form.get("duration") || undefined,
           statusNote: form.get("statusNote") || undefined,
+          category: form.get("category") || undefined,
         }),
       });
       setEditing(false);
@@ -72,6 +75,7 @@ export default function LeadDetailsEditor({
           )}
         </div>
         <div className="text-sm">
+          {row("Category", details.category ? LEAD_CATEGORY_LABELS[details.category] : null)}
           {row("ID name", details.idName)}
           {row("ID URL", details.idUrl)}
           {row("Country", details.country)}
@@ -88,6 +92,14 @@ export default function LeadDetailsEditor({
   return (
     <form onSubmit={onSubmit} className="card space-y-2 p-4">
       <h2 className="mb-1 text-sm font-semibold text-slate-900">Edit lead details</h2>
+      <select name="category" defaultValue={details.category ?? ""} className="input">
+        <option value="">— No category —</option>
+        {LEAD_CATEGORIES.map((c) => (
+          <option key={c} value={c}>
+            {LEAD_CATEGORY_LABELS[c]}
+          </option>
+        ))}
+      </select>
       <div className="grid grid-cols-2 gap-2">
         <input name="idName" defaultValue={details.idName ?? ""} placeholder="ID name" className="input" />
         <input name="idUrl" defaultValue={details.idUrl ?? ""} placeholder="ID URL" className="input" />

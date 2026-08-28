@@ -156,6 +156,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               price: lead.price != null ? String(lead.price) : null,
               duration: lead.duration,
               statusNote: lead.statusNote,
+              category: lead.category,
             }}
           />
 

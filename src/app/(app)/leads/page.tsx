@@ -9,6 +9,8 @@ import OwnerSelector from "@/components/owner-selector";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
 import { formatCurrency, formatDateTime, localDateBoundary, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
+import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
+import type { LeadCategory } from "@prisma/client";
 
 export default async function LeadsPage({
   searchParams,
@@ -18,6 +20,7 @@ export default async function LeadsPage({
     stageId?: string;
     ownerId?: string;
     createdById?: string;
+    category?: string;
     from?: string;
     to?: string;
     tzOffset?: string;
@@ -25,7 +28,7 @@ export default async function LeadsPage({
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { q, stageId, ownerId, createdById, from, to, tzOffset } = await searchParams;
+  const { q, stageId, ownerId, createdById, category, from, to, tzOffset } = await searchParams;
   const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
@@ -36,6 +39,7 @@ export default async function LeadsPage({
         organizationId: session.orgId,
         ...leadWhereForSession(session),
         ...(stageId ? { stageId } : {}),
+        ...(category ? { category: category as LeadCategory } : {}),
         ...(admin && ownerId ? { ownerId } : {}),
         ...(admin && createdById ? { createdById } : {}),
         ...(admin && (from || to)
@@ -115,6 +119,14 @@ export default async function LeadsPage({
               </option>
             ))}
           </select>
+          <select name="category" defaultValue={category ?? ""} className="input max-w-[160px]">
+            <option value="">All categories</option>
+            {LEAD_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {LEAD_CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
           {admin && (
             <>
               <select name="ownerId" defaultValue={ownerId ?? ""} className="input max-w-[160px]">
@@ -152,6 +164,7 @@ export default async function LeadsPage({
                 <th className="px-4 py-2 font-medium">ID name / URL</th>
                 <th className="px-4 py-2 font-medium">Country</th>
                 <th className="px-4 py-2 font-medium">Website</th>
+                <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium">Stage</th>
                 <th className="px-4 py-2 font-medium">Price</th>
                 <th className="px-4 py-2 font-medium">Delivery</th>
@@ -197,6 +210,9 @@ export default async function LeadsPage({
                       "—"
                     )}
                   </td>
+                  <td className="px-4 py-2.5 text-slate-600">
+                    {lead.category ? LEAD_CATEGORY_LABELS[lead.category] : "—"}
+                  </td>
                   <td className="px-4 py-2.5">
                     <StageBadge name={lead.stage.name} isWon={lead.stage.isWon} isLost={lead.stage.isLost} />
                   </td>
@@ -228,7 +244,7 @@ export default async function LeadsPage({
               ))}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={admin ? 11 : 10} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={admin ? 12 : 11} className="px-4 py-10 text-center text-slate-400">
                     No leads yet. Add one or import a CSV to get started.
                   </td>
                 </tr>

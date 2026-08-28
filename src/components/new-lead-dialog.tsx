@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
 
 export default function NewLeadDialog() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function NewLeadDialog() {
           price: form.get("price") || undefined,
           duration: form.get("duration") || undefined,
           statusNote: form.get("statusNote") || undefined,
+          category: form.get("category") || undefined,
         }),
       });
       if (!res.ok) {
@@ -122,9 +124,22 @@ export default function NewLeadDialog() {
               <input name="duration" className="input" placeholder="2 weeks" />
             </div>
           </div>
-          <div>
-            <label className="label">Status</label>
-            <input name="statusNote" className="input" placeholder="e.g. Text on WhatsApp (Ibrahim)" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Category</label>
+              <select name="category" className="input" defaultValue="">
+                <option value="">— None —</option>
+                {LEAD_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {LEAD_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Status</label>
+              <input name="statusNote" className="input" placeholder="e.g. Text on WhatsApp (Ibrahim)" />
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>

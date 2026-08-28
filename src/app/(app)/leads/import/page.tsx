@@ -11,11 +11,13 @@ export default function ImportLeadsPage() {
             Expected columns (case-insensitive, any order — matches your sheet):{" "}
             <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
               Id Name, ID URL, Client Name, Country, Website URL, Contact, Email, Delivery, Price,
-              Duration, Status
+              Duration, Status, Category
             </code>
-            . Each row needs a client name and at least a phone, email, or website. Rows matching an
-            existing lead (by phone, email, or website/ID URL) are skipped as duplicates. New leads
-            come in unassigned — a Super Admin allocates them to a sales agent afterwards.
+            . Category matches Web Development / Graphic Design / UI Design / SEO / SMM (any of
+            those spellings, case-insensitive) — unrecognized text is left blank. Each row needs a
+            client name and at least a phone, email, or website. Rows matching an existing lead's
+            phone, email, or website are skipped as duplicates. New leads come in unassigned — a
+            Super Admin allocates them to a sales agent afterwards.
           </p>
           <ImportForm />
         </div>
