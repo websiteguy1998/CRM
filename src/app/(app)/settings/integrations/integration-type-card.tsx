@@ -158,13 +158,14 @@ export default function IntegrationTypeCard({
               generated there (not the normal Gmail password).
             </p>
           )}
-          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3" autoComplete="off">
             <div>
               <label className="label">Label</label>
               <input
                 name="__label"
                 required
                 className="input"
+                autoComplete="off"
                 placeholder={
                   type === "WHATSAPP" ? "e.g. Sales number" : type === "GMAIL" ? "e.g. Support inbox" : "Name this account"
                 }
@@ -177,6 +178,7 @@ export default function IntegrationTypeCard({
                   name={f.key}
                   type={f.secret ? "password" : "text"}
                   className="input"
+                  autoComplete={f.secret ? "new-password" : "off"}
                   placeholder={f.placeholder}
                 />
               </div>
