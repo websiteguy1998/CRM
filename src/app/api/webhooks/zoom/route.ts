@@ -47,6 +47,7 @@ async function recordZoomCallLog(organizationId: string, log: Record<string, unk
   const durationSec = Number(log.duration ?? 0) || 0;
   const status = mapStatus(log.result, durationSec);
   const dateTime = typeof log.date_time === "string" ? new Date(log.date_time) : new Date();
+  const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
 
   const call = await prisma.call.create({
     data: {
@@ -61,6 +62,13 @@ async function recordZoomCallLog(organizationId: string, log: Record<string, unk
       startedAt: Number.isNaN(dateTime.getTime()) ? new Date() : dateTime,
     },
   });
+
+  if (hasRecording) {
+    await prisma.call.update({
+      where: { id: call.id },
+      data: { recordingUrl: `/api/leads/${lead.id}/calls/${call.id}/recording` },
+    });
+  }
 
   const minutes = Math.floor(durationSec / 60);
   const seconds = durationSec % 60;

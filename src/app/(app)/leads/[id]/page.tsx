@@ -45,6 +45,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         source: true,
         campaign: true,
         deals: true,
+        calls: { orderBy: { startedAt: "desc" } },
         tasks: { orderBy: { dueAt: "asc" } },
         activities: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },
@@ -177,6 +178,30 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {openTasks.length === 0 && <li className="text-slate-400">Nothing scheduled.</li>}
             </ul>
           </div>
+
+          {lead.calls.length > 0 && (
+            <div className="card p-4">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Calls</h2>
+              <ul className="space-y-3 text-sm">
+                {lead.calls.map((c) => (
+                  <li key={c.id} className="border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-800">
+                        {c.direction === "OUTBOUND" ? "Outbound" : "Inbound"} · {c.status.toLowerCase()}
+                        {c.durationSec > 0
+                          ? ` (${Math.floor(c.durationSec / 60)}:${(c.durationSec % 60).toString().padStart(2, "0")})`
+                          : ""}
+                      </span>
+                      <span className="text-xs text-slate-400">{relativeTime(c.startedAt)}</span>
+                    </div>
+                    {c.recordingUrl && (
+                      <audio controls preload="none" src={c.recordingUrl} className="mt-2 h-8 w-full" />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {lead.deals.length > 0 && (
             <div className="card p-4">

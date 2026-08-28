@@ -68,6 +68,32 @@ export async function clickToCall(organizationId: string, agentZoomEmail: string
   }
 }
 
+/**
+ * Looks up the downloadable recording for a finished call (by Zoom's
+ * call_id) and returns the Zoom-hosted URL plus the bearer token needed to
+ * fetch it — Zoom's recording URLs require that same Authorization header,
+ * so callers must proxy the audio through our own server rather than
+ * linking the browser straight to Zoom.
+ */
+export async function getCallRecordingDownloadInfo(
+  organizationId: string,
+  zoomCallId: string
+): Promise<{ url: string; token: string; contentType?: string } | null> {
+  const config = await getZoomConfig(organizationId);
+  if (!config) return null;
+  const token = await getAccessToken(config);
+
+  const res = await fetch(`https://api.zoom.us/v2/phone/call_logs/${encodeURIComponent(zoomCallId)}/recordings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const recording = data.recordings?.[0];
+  if (!recording?.download_url) return null;
+  return { url: recording.download_url, token, contentType: recording.file_type };
+}
+
 /** Zoom's webhook URL-validation handshake — echoes back an HMAC of their challenge token. */
 export function computeZoomChallengeResponse(plainToken: string, secretToken: string) {
   return crypto.createHmac("sha256", secretToken).update(plainToken).digest("hex");
