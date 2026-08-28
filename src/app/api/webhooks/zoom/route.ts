@@ -23,16 +23,25 @@ function mapStatus(result: unknown, durationSec: number): CallStatus {
 
 async function recordZoomCallLog(organizationId: string, log: Record<string, unknown>) {
   const callId = String(log.call_id ?? log.id ?? "");
-  if (!callId) return;
+  if (!callId) {
+    console.log("[zoom webhook] skipped: no call_id/id in payload", JSON.stringify(log).slice(0, 500));
+    return;
+  }
 
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
-  if (existing) return;
+  if (existing) {
+    console.log(`[zoom webhook] skipped: call ${callId} already recorded`);
+    return;
+  }
 
   const direction = mapDirection(log.direction);
   const callerNumber = typeof log.caller_number === "string" ? log.caller_number : undefined;
   const calleeNumber = typeof log.callee_number === "string" ? log.callee_number : undefined;
   const customerNumber = direction === "OUTBOUND" ? calleeNumber : callerNumber;
-  if (!customerNumber) return;
+  if (!customerNumber) {
+    console.log(`[zoom webhook] skipped: no caller/callee number for call ${callId}`, JSON.stringify(log).slice(0, 500));
+    return;
+  }
 
   const lead = await findOrCreateLeadForContact({
     organizationId,
@@ -81,6 +90,8 @@ async function recordZoomCallLog(organizationId: string, log: Record<string, unk
     }`,
     metadata: { callId: call.id },
   });
+
+  console.log(`[zoom webhook] recorded call ${call.id} for lead ${lead.id}`);
 }
 
 /**
@@ -134,9 +145,12 @@ export async function POST(req: NextRequest) {
   if (CALL_LOG_EVENTS.has(payload.event)) {
     const object = payload.payload?.object ?? {};
     const callLogs: Record<string, unknown>[] = Array.isArray(object.call_logs) ? object.call_logs : [object];
+    console.log(`[zoom webhook] ${payload.event}: ${callLogs.length} call log(s)`);
     for (const log of callLogs) {
       await recordZoomCallLog(organizationId, log);
     }
+  } else {
+    console.log(`[zoom webhook] ignored event: ${payload.event}`);
   }
 
   return NextResponse.json({ ok: true });
