@@ -6,7 +6,8 @@ import StageBadge from "@/components/stage-badge";
 import ScoreBadge from "@/components/score-badge";
 import NewLeadDialog from "@/components/new-lead-dialog";
 import OwnerSelector from "@/components/owner-selector";
-import { formatCurrency, formatDateTime, relativeTime } from "@/lib/format";
+import TimezoneOffsetInput from "@/components/timezone-offset-input";
+import { formatCurrency, formatDateTime, localDateBoundary, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
 
 export default async function LeadsPage({
@@ -19,11 +20,13 @@ export default async function LeadsPage({
     createdById?: string;
     from?: string;
     to?: string;
+    tzOffset?: string;
   }>;
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { q, stageId, ownerId, createdById, from, to } = await searchParams;
+  const { q, stageId, ownerId, createdById, from, to, tzOffset } = await searchParams;
+  const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
 
@@ -38,8 +41,8 @@ export default async function LeadsPage({
         ...(admin && (from || to)
           ? {
               createdAt: {
-                ...(from ? { gte: new Date(from) } : {}),
-                ...(to ? { lte: new Date(`${to}T23:59:59`) } : {}),
+                ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
+                ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
               },
             }
           : {}),
@@ -97,6 +100,7 @@ export default async function LeadsPage({
       />
       <div className="p-6">
         <form className="mb-4 flex flex-wrap gap-2" method="GET">
+          <TimezoneOffsetInput />
           <input
             name="q"
             defaultValue={q}

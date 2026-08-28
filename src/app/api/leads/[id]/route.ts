@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
+import { normalizeIdentifyingField } from "@/lib/duplicate-lead";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
@@ -60,10 +61,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Only a Super Admin can allocate leads" }, { status: 403 });
   }
 
-  const { deliveryDate, ...rest } = parsed.data;
+  const { deliveryDate, idUrl, websiteUrl, ...rest } = parsed.data;
   const updated = await prisma.lead.update({
     where: { id },
-    data: { ...rest, ...(deliveryDate ? { deliveryDate: new Date(deliveryDate) } : {}) },
+    data: {
+      ...rest,
+      ...(idUrl !== undefined ? { idUrl: normalizeIdentifyingField(idUrl) ?? null } : {}),
+      ...(websiteUrl !== undefined ? { websiteUrl: normalizeIdentifyingField(websiteUrl) ?? null } : {}),
+      ...(deliveryDate ? { deliveryDate: new Date(deliveryDate) } : {}),
+    },
     include: { contact: true, owner: true },
   });
 

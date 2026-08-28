@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { getFirstStage } from "@/lib/pipeline";
 import { logActivity } from "@/lib/timeline";
-import { findDuplicateLead } from "@/lib/duplicate-lead";
+import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
 
 const HEADER_ALIASES: Record<string, string> = {
   "id name": "idName",
@@ -88,11 +88,11 @@ export async function POST(req: NextRequest) {
   const errors: string[] = [];
 
   for (const [i, row] of records.entries()) {
-    const clientName = row.clientName?.trim();
-    const phone = normalizePhone(row.phone);
-    const email = row.email?.trim().toLowerCase();
-    const websiteUrl = row.websiteUrl?.trim() || undefined;
-    const idUrl = row.idUrl?.trim() || undefined;
+    const clientName = normalizeIdentifyingField(row.clientName);
+    const phone = normalizePhone(normalizeIdentifyingField(row.phone));
+    const email = normalizeIdentifyingField(row.email)?.toLowerCase();
+    const websiteUrl = normalizeIdentifyingField(row.websiteUrl);
+    const idUrl = normalizeIdentifyingField(row.idUrl);
 
     if (!clientName || (!phone && !email && !websiteUrl)) {
       errors.push(`Row ${i + 2}: needs a client name and at least a phone, email, or website`);

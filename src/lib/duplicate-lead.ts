@@ -1,6 +1,23 @@
 import { prisma } from "@/lib/prisma";
 
 /**
+ * People fill blank sheet cells with "-", "n/a", etc. If that gets typed
+ * into an identifying field (phone/email/website/ID URL) and stored as a
+ * real value, every subsequent lead with the same placeholder would match
+ * as a "duplicate" of the first one that had it. Treat those as empty
+ * everywhere an identifying field is read from user input — both for the
+ * duplicate check and before saving, so the placeholder never gets stored
+ * as if it meant something.
+ */
+export function normalizeIdentifyingField(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (/^[-–—.]+$/.test(trimmed)) return undefined; // "-", "--", "n/a"-style dashes
+  if (/^n\/?a$/i.test(trimmed) || /^none$/i.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+/**
  * The one thing every lead-entry person must be warned about: someone else
  * (or themselves, earlier) may have already logged this exact client.
  * Matches on phone, email, or website/profile URL — whichever is present —
@@ -10,7 +27,10 @@ export async function findDuplicateLead(
   organizationId: string,
   fields: { phone?: string; email?: string; websiteUrl?: string; idUrl?: string }
 ) {
-  const { phone, email, websiteUrl, idUrl } = fields;
+  const phone = normalizeIdentifyingField(fields.phone);
+  const email = normalizeIdentifyingField(fields.email);
+  const websiteUrl = normalizeIdentifyingField(fields.websiteUrl);
+  const idUrl = normalizeIdentifyingField(fields.idUrl);
   const or: Array<Record<string, unknown>> = [];
 
   if (phone || email) {

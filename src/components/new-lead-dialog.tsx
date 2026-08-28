@@ -60,7 +60,7 @@ export default function NewLeadDialog() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">New lead</h2>
-        <form onSubmit={onSubmit} className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+        <form onSubmit={onSubmit} autoComplete="off" className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
           {error && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}

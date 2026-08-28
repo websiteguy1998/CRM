@@ -5,7 +5,7 @@ import { requireApiSession } from "@/lib/api-auth";
 import { getFirstStage } from "@/lib/pipeline";
 import { logActivity } from "@/lib/timeline";
 import { leadWhereForSession, isAdmin } from "@/lib/access";
-import { findDuplicateLead } from "@/lib/duplicate-lead";
+import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
 
 export async function GET(req: NextRequest) {
   const auth = await requireApiSession();
@@ -86,13 +86,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const data = parsed.data;
+  const phone = normalizeIdentifyingField(data.phone);
+  const email = normalizeIdentifyingField(data.email);
+  const websiteUrl = normalizeIdentifyingField(data.websiteUrl);
+  const idUrl = normalizeIdentifyingField(data.idUrl);
 
-  const duplicate = await findDuplicateLead(orgId, {
-    phone: data.phone,
-    email: data.email || undefined,
-    websiteUrl: data.websiteUrl,
-    idUrl: data.idUrl,
-  });
+  const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl, idUrl });
   if (duplicate) {
     return NextResponse.json(
       {
@@ -109,8 +108,8 @@ export async function POST(req: NextRequest) {
     data: {
       organizationId: orgId,
       firstName: data.clientName,
-      email: data.email || undefined,
-      phone: data.phone,
+      email,
+      phone,
     },
   });
 
@@ -124,9 +123,9 @@ export async function POST(req: NextRequest) {
       stageId: stage.id,
       createdById: sub,
       idName: data.idName,
-      idUrl: data.idUrl,
+      idUrl,
       country: data.country,
-      websiteUrl: data.websiteUrl,
+      websiteUrl,
       deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
       price: data.price,
       duration: data.duration,

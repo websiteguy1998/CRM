@@ -1,3 +1,23 @@
+/**
+ * Converts a plain "YYYY-MM-DD" date input value into the UTC instant that
+ * corresponds to local midnight (or local end-of-day, with endOfDay) in the
+ * viewer's timezone. `tzOffsetMinutes` is `Date.getTimezoneOffset()` from
+ * the browser — see TimezoneOffsetInput. Without this, a date filter
+ * silently misattributes anything created near the start/end of the local
+ * day for every viewer not in UTC.
+ */
+export function localDateBoundary(
+  dateStr: string,
+  tzOffsetMinutes: number,
+  endOfDay = false
+) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const base = endOfDay
+    ? Date.UTC(year, month - 1, day, 23, 59, 59, 999)
+    : Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  return new Date(base + tzOffsetMinutes * 60_000);
+}
+
 export function initials(name: string) {
   return name
     .split(" ")
