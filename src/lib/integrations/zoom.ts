@@ -1,0 +1,85 @@
+import crypto from "crypto";
+import { prisma } from "@/lib/prisma";
+
+/**
+ * Zoom Phone integration (Server-to-Server OAuth app from the Zoom
+ * Marketplace). Two pieces:
+ *  - Click-to-call: POST /phone/users/{agentEmail}/calls rings the agent's
+ *    own Zoom Phone device first, then bridges to the callee once answered
+ *    — that's how Zoom Phone's API supports "click to call" today; there's
+ *    no way to dial straight to the customer without the agent's device
+ *    ringing first.
+ *  - Automatic call sync: Zoom calls our webhook (/api/webhooks/zoom) with
+ *    `phone.call_log_completed` once a call's log entry is finalized —
+ *    that event carries duration, direction, numbers and any recording,
+ *    which we attach to the matching lead automatically.
+ */
+
+type ZoomConfig = { accountId: string; clientId: string; clientSecret: string; webhookSecretToken?: string };
+
+export async function getZoomConfig(organizationId: string): Promise<ZoomConfig | null> {
+  const account = await prisma.integrationAccount.findFirst({
+    where: { organizationId, type: "ZOOM_PHONE", status: "CONNECTED" },
+    orderBy: { createdAt: "asc" },
+  });
+  const config = account?.config as Partial<ZoomConfig> | null;
+  if (!config?.accountId || !config?.clientId || !config?.clientSecret) return null;
+  return {
+    accountId: config.accountId,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    webhookSecretToken: config.webhookSecretToken,
+  };
+}
+
+async function getAccessToken(config: ZoomConfig): Promise<string> {
+  const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+  const res = await fetch(
+    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(config.accountId)}`,
+    { method: "POST", headers: { Authorization: `Basic ${basicAuth}` } }
+  );
+  if (!res.ok) {
+    throw new Error(`Zoom OAuth token request failed: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.access_token as string;
+}
+
+/**
+ * Rings `agentZoomEmail`'s own Zoom Phone device; once they pick up, Zoom
+ * bridges the call to `calleeNumber`. Throws with the underlying Zoom error
+ * message on failure (e.g. agent has no Zoom Phone license) so the caller
+ * can surface something actionable instead of a silent no-op.
+ */
+export async function clickToCall(organizationId: string, agentZoomEmail: string, calleeNumber: string) {
+  const config = await getZoomConfig(organizationId);
+  if (!config) {
+    throw new Error("Zoom Phone isn't connected yet — add it in Settings → Integrations.");
+  }
+  const token = await getAccessToken(config);
+
+  const res = await fetch(`https://api.zoom.us/v2/phone/users/${encodeURIComponent(agentZoomEmail)}/calls`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ callee: calleeNumber }),
+  });
+  if (!res.ok) {
+    throw new Error(`Zoom declined the call request: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Zoom's webhook URL-validation handshake — echoes back an HMAC of their challenge token. */
+export function computeZoomChallengeResponse(plainToken: string, secretToken: string) {
+  return crypto.createHmac("sha256", secretToken).update(plainToken).digest("hex");
+}
+
+/** Verifies the x-zm-signature header on every other Zoom webhook event. */
+export function verifyZoomSignature(
+  rawBody: string,
+  timestamp: string,
+  signature: string,
+  secretToken: string
+) {
+  const hash = crypto.createHmac("sha256", secretToken).update(`v0:${timestamp}:${rawBody}`).digest("hex");
+  return signature === `v0=${hash}`;
+}

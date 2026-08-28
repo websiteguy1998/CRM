@@ -12,7 +12,8 @@ const TYPES = [
   {
     type: "ZOOM_PHONE" as const,
     title: "Zoom Phone",
-    description: "Server-to-Server OAuth app — click-to-call, recordings, transcripts.",
+    description:
+      "Server-to-Server OAuth app — click-to-call plus automatic call logging. After saving, add this webhook URL in your Zoom Marketplace app's Event Subscriptions (subscribe to \"Call Log Completed\"): /api/webhooks/zoom on this site's domain — and paste the Secret Token it gives you into the field below.",
   },
   {
     type: "GMAIL" as const,

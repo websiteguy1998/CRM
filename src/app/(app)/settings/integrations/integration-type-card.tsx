@@ -16,6 +16,7 @@ const FIELDS: Record<string, FieldDef[]> = {
     { key: "accountId", label: "Account ID" },
     { key: "clientId", label: "Client ID" },
     { key: "clientSecret", label: "Client secret", secret: true },
+    { key: "webhookSecretToken", label: "Webhook secret token", secret: true },
   ],
   GMAIL: [
     { key: "email", label: "Gmail address", placeholder: "you@gmail.com" },

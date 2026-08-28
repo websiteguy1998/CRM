@@ -33,7 +33,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
 
-  const [lead, owners] = await Promise.all([
+  const [lead, owners, currentUser] = await Promise.all([
     prisma.lead.findFirst({
       where: { id, organizationId: session.orgId, ...leadWhereForSession(session) },
       include: {
@@ -50,6 +50,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       },
     }),
     prisma.user.findMany({ where: { organizationId: session.orgId, active: true } }),
+    prisma.user.findUnique({ where: { id: session.sub }, select: { zoomUserEmail: true } }),
   ]);
 
   if (!lead) notFound();
@@ -141,6 +142,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               leadId={lead.id}
               hasPhone={Boolean(lead.contact.phone)}
               hasEmail={Boolean(lead.contact.email)}
+              zoomUserEmail={currentUser?.zoomUserEmail ?? null}
             />
           )}
 

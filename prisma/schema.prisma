@@ -55,6 +55,9 @@ model User {
   // false = pending admin approval (self-signups start here); an
   // admin-created user (Settings -> Add user) starts true.
   active         Boolean  @default(true)
+  // The Zoom account (usually their work email) this agent places
+  // click-to-call calls from. Self-service — set from the Call tab.
+  zoomUserEmail  String?
   createdAt      DateTime @default(now())
 
   teamMemberships TeamMember[]

@@ -16,7 +16,7 @@ import type { Channel } from "@prisma/client";
 const resolveOrganizationId = getPrimaryOrganizationId;
 
 /** Finds the contact/lead a phone or email belongs to, creating both if this is a brand-new inbound contact. */
-async function findOrCreateLeadForContact(params: {
+export async function findOrCreateLeadForContact(params: {
   organizationId: string;
   phone?: string;
   email?: string;
