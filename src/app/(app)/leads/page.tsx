@@ -93,7 +93,7 @@ export default async function LeadsPage({
         }
         actions={
           <>
-            {(admin || entryOnly) && (
+            {admin && (
               <Link href="/leads/import" className="btn-secondary">
                 Import CSV
               </Link>
@@ -169,8 +169,8 @@ export default async function LeadsPage({
                 <th className="px-4 py-2 font-medium">Stage</th>
                 <th className="px-4 py-2 font-medium">Price</th>
                 <th className="px-4 py-2 font-medium">Delivery</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">Owner</th>
+                {!entryOnly && <th className="px-4 py-2 font-medium">Status</th>}
+                {!entryOnly && <th className="px-4 py-2 font-medium">Owner</th>}
                 {admin && <th className="px-4 py-2 font-medium">Entered by</th>}
                 <th className="px-4 py-2 font-medium">Last activity</th>
               </tr>
@@ -229,20 +229,24 @@ export default async function LeadsPage({
                   <td className="px-4 py-2.5 text-slate-600">
                     {lead.deliveryDate ? formatDateTime(lead.deliveryDate) : "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{lead.statusNote ?? "—"}</td>
-                  <td className="px-4 py-2.5">
-                    {admin ? (
-                      <OwnerSelector
-                        leadId={lead.id}
-                        owners={owners
-                          .filter((o) => o.role === "AGENT" || o.role === "MANAGER")
-                          .map((o) => ({ id: o.id, name: o.name }))}
-                        currentOwnerId={lead.ownerId}
-                      />
-                    ) : (
-                      <span className="text-slate-600">{lead.owner?.name ?? "Unassigned"}</span>
-                    )}
-                  </td>
+                  {!entryOnly && (
+                    <td className="px-4 py-2.5 text-slate-600">{lead.statusNote ?? "—"}</td>
+                  )}
+                  {!entryOnly && (
+                    <td className="px-4 py-2.5">
+                      {admin ? (
+                        <OwnerSelector
+                          leadId={lead.id}
+                          owners={owners
+                            .filter((o) => o.role === "AGENT" || o.role === "MANAGER")
+                            .map((o) => ({ id: o.id, name: o.name }))}
+                          currentOwnerId={lead.ownerId}
+                        />
+                      ) : (
+                        <span className="text-slate-600">{lead.owner?.name ?? "Unassigned"}</span>
+                      )}
+                    </td>
+                  )}
                   {admin && (
                     <td className="px-4 py-2.5 text-slate-600">{lead.createdBy?.name ?? "—"}</td>
                   )}
@@ -251,7 +255,10 @@ export default async function LeadsPage({
               ))}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={admin ? 13 : 12} className="px-4 py-10 text-center text-slate-400">
+                  <td
+                    colSpan={10 + (entryOnly ? 0 : 2) + (admin ? 1 : 0)}
+                    className="px-4 py-10 text-center text-slate-400"
+                  >
                     No leads yet. Add one or import a CSV to get started.
                   </td>
                 </tr>
