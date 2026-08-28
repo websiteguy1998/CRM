@@ -157,11 +157,12 @@ export default async function LeadsPage({
         </form>
 
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1700px] whitespace-nowrap text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                 <th className="px-4 py-2 font-medium">Client</th>
-                <th className="px-4 py-2 font-medium">ID name / URL</th>
+                <th className="px-4 py-2 font-medium">ID name</th>
+                <th className="px-4 py-2 font-medium">ID URL</th>
                 <th className="px-4 py-2 font-medium">Country</th>
                 <th className="px-4 py-2 font-medium">Website</th>
                 <th className="px-4 py-2 font-medium">Category</th>
@@ -185,19 +186,25 @@ export default async function LeadsPage({
                         {lead.contact.firstName}
                       </Link>
                     )}
-                    <div className="text-xs text-slate-400">{lead.contact.phone || lead.contact.email}</div>
+                    <div className="text-xs text-slate-400">
+                      {lead.contact.phone && <span>{lead.contact.phone}</span>}
+                      {lead.contact.phone && lead.contact.email && <span> · </span>}
+                      {lead.contact.email && <span>{lead.contact.email}</span>}
+                    </div>
                   </td>
+                  <td className="px-4 py-2.5 text-slate-600">{lead.idName ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">
-                    {lead.idName ?? "—"}
-                    {lead.idUrl && (
+                    {lead.idUrl ? (
                       <a
                         href={lead.idUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="ml-1 text-indigo-600 hover:underline"
+                        className="text-indigo-600 hover:underline"
                       >
-                        ↗
+                        {lead.idUrl.replace(/^https?:\/\//, "")}
                       </a>
+                    ) : (
+                      "—"
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{lead.country ?? "—"}</td>
@@ -244,7 +251,7 @@ export default async function LeadsPage({
               ))}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={admin ? 12 : 11} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={admin ? 13 : 12} className="px-4 py-10 text-center text-slate-400">
                     No leads yet. Add one or import a CSV to get started.
                   </td>
                 </tr>
