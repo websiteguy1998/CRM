@@ -13,12 +13,20 @@ function mapDirection(raw: unknown): CallDirection {
 function mapStatus(result: unknown, durationSec: number): CallStatus {
   const r = String(result ?? "").toLowerCase();
   if (r.includes("voicemail")) return "VOICEMAIL";
-  if (r.includes("no answer")) return "NO_ANSWER";
-  if (r.includes("missed") || r.includes("forward") || r.includes("cancel") || r.includes("busy") || r.includes("reject")) {
+  if (r.includes("no answer") || r.includes("missed") || r.includes("forward") || r.includes("cancel") || r.includes("busy") || r.includes("reject")) {
     return "MISSED";
   }
-  if (r.includes("connect") || durationSec > 0) return "ANSWERED";
+  if (r.includes("answer") || r.includes("connect") || durationSec > 0) return "ANSWERED";
   return "MISSED";
+}
+
+/** Zoom's external party is identified by a DID number; the internal party is an extension/user id, not a phone number. */
+function externalNumber(log: Record<string, unknown>, side: "caller" | "callee"): string | undefined {
+  const didKey = `${side}_did_number`;
+  const numberKey = `${side}_number`;
+  if (typeof log[didKey] === "string") return log[didKey] as string;
+  if (typeof log[numberKey] === "string") return log[numberKey] as string;
+  return undefined;
 }
 
 async function recordZoomCallLog(organizationId: string, log: Record<string, unknown>) {
@@ -35,8 +43,8 @@ async function recordZoomCallLog(organizationId: string, log: Record<string, unk
   }
 
   const direction = mapDirection(log.direction);
-  const callerNumber = typeof log.caller_number === "string" ? log.caller_number : undefined;
-  const calleeNumber = typeof log.callee_number === "string" ? log.callee_number : undefined;
+  const callerNumber = externalNumber(log, "caller");
+  const calleeNumber = externalNumber(log, "callee");
   const customerNumber = direction === "OUTBOUND" ? calleeNumber : callerNumber;
   if (!customerNumber) {
     console.log(`[zoom webhook] skipped: no caller/callee number for call ${callId}`, JSON.stringify(log).slice(0, 500));
