@@ -31,7 +31,7 @@ export default function OwnerSelector({
 
   return (
     <select
-      className="input"
+      className="input min-w-[150px]"
       defaultValue={currentOwnerId ?? ""}
       disabled={loading}
       onChange={(e) => onChange(e.target.value)}

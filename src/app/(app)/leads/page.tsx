@@ -170,7 +170,7 @@ export default async function LeadsPage({
                 <th className="px-4 py-2 font-medium">Price</th>
                 <th className="px-4 py-2 font-medium">Delivery</th>
                 {!entryOnly && <th className="px-4 py-2 font-medium">Status</th>}
-                {!entryOnly && <th className="px-4 py-2 font-medium">Owner</th>}
+                {!entryOnly && <th className="px-4 py-2 font-medium">Seller</th>}
                 {admin && <th className="px-4 py-2 font-medium">Entered by</th>}
                 <th className="px-4 py-2 font-medium">Last activity</th>
               </tr>

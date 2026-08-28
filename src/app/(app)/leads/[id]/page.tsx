@@ -83,7 +83,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
               </div>
               <div>
-                <p className="label mb-1">Owner</p>
+                <p className="label mb-1">Seller</p>
                 {admin ? (
                   <OwnerSelector
                     leadId={lead.id}
