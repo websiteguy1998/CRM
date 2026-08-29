@@ -34,7 +34,20 @@ export default async function DashboardPage() {
     agents,
     pendingSignups,
   ] = await Promise.all([
-    prisma.lead.count({ where: { organizationId: orgId, createdAt: { gte: today }, ...leadWhere } }),
+    // For an agent, "created today" org-wide is the wrong question — a
+    // lead someone else entered days ago and just got allocated to them
+    // today should read as new to them. Full-visibility roles keep the
+    // literal "created today" count.
+    fullAccess
+      ? prisma.lead.count({ where: { organizationId: orgId, createdAt: { gte: today } } })
+      : prisma.activity.count({
+          where: {
+            organizationId: orgId,
+            type: "LEAD_ASSIGNED",
+            createdAt: { gte: today },
+            lead: { ownerId: session.sub },
+          },
+        }),
     prisma.activity.count({
       where: {
         organizationId: orgId,
@@ -117,7 +130,7 @@ export default async function DashboardPage() {
   leaderboard.sort((a, b) => b.revenue - a.revenue);
 
   const stats = [
-    { label: "New leads today", value: newLeadsToday },
+    { label: fullAccess ? "New leads today" : "Assigned to you today", value: newLeadsToday },
     { label: "Contacted today", value: contactedToday },
     { label: "Conversations today", value: conversationsToday },
     { label: "Calls today", value: callsToday },
