@@ -15,6 +15,20 @@ import type { Channel } from "@prisma/client";
  */
 const resolveOrganizationId = getPrimaryOrganizationId;
 
+/**
+ * Looks up the lead for a phone number WITHOUT creating anything — used by
+ * Zoom call sync, where a call to/from a number that isn't an existing
+ * lead shouldn't spawn a new one (unlike WhatsApp/SMS/email, where any
+ * inbound message is treated as a fresh lead).
+ */
+export async function findLeadForContact(organizationId: string, phone: string) {
+  const contact = await prisma.contact.findFirst({
+    where: { organizationId, phone },
+    include: { leads: { orderBy: { createdAt: "desc" }, take: 1 } },
+  });
+  return contact?.leads[0] ?? null;
+}
+
 /** Finds the contact/lead a phone or email belongs to, creating both if this is a brand-new inbound contact. */
 export async function findOrCreateLeadForContact(params: {
   organizationId: string;

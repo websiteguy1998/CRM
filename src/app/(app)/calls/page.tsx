@@ -37,7 +37,10 @@ export default async function CallsPage({
     prisma.call.findMany({
       where: {
         organizationId: session.orgId,
-        lead: leadWhereForSession(session),
+        // Full-visibility roles also see calls that never matched a lead
+        // (no owner to check); everyone else only sees calls on leads
+        // they're allowed to see, which excludes leadless calls entirely.
+        ...(fullVisibility ? {} : { lead: leadWhereForSession(session) }),
         ...(fullVisibility && agentId ? { agentId } : {}),
         ...(direction ? { direction: direction as CallDirection } : {}),
         ...(status ? { status: status as CallStatus } : {}),
@@ -51,16 +54,21 @@ export default async function CallsPage({
           : {}),
         ...(q
           ? {
-              lead: {
-                ...leadWhereForSession(session),
-                contact: {
-                  OR: [
-                    { firstName: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                    { phone: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                    { email: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                  ],
+              OR: [
+                { fromNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                { toNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                {
+                  lead: {
+                    contact: {
+                      OR: [
+                        { firstName: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                        { phone: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                        { email: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                      ],
+                    },
+                  },
                 },
-              },
+              ],
             }
           : {}),
       },
@@ -140,9 +148,15 @@ export default async function CallsPage({
                 return (
                   <tr key={call.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-2.5">
-                      <Link href={`/leads/${call.leadId}`} className="font-medium text-slate-800 hover:underline">
-                        {call.lead.contact.firstName} {call.lead.contact.lastName}
-                      </Link>
+                      {call.lead ? (
+                        <Link href={`/leads/${call.leadId}`} className="font-medium text-slate-800 hover:underline">
+                          {call.lead.contact.firstName} {call.lead.contact.lastName}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">
+                          {(call.direction === "OUTBOUND" ? call.toNumber : call.fromNumber) ?? "Unknown number"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{call.agent?.name ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-600">{call.direction}</td>

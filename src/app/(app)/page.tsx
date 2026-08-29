@@ -51,7 +51,9 @@ export default async function DashboardPage() {
         lead: leadWhere,
       },
     }),
-    prisma.call.count({ where: { organizationId: orgId, startedAt: { gte: today }, lead: leadWhere } }),
+    prisma.call.count({
+      where: { organizationId: orgId, startedAt: { gte: today }, ...(fullAccess ? {} : { lead: leadWhere }) },
+    }),
     prisma.task.count({
       where: { organizationId: orgId, completedAt: null, dueAt: { lte: new Date() }, lead: leadWhere },
     }),

@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { findOrCreateLeadForContact } from "@/lib/inbound";
+import { findLeadForContact } from "@/lib/inbound";
 import { logActivity } from "@/lib/timeline";
 import { getPhoneUserEmail } from "@/lib/integrations/zoom";
 import type { CallDirection, CallStatus } from "@prisma/client";
+
+function recordingUrlFor(leadId: string | null | undefined, callId: string) {
+  return leadId ? `/api/leads/${leadId}/calls/${callId}/recording` : `/api/calls/${callId}/recording`;
+}
 
 function mapDirection(raw: unknown): CallDirection {
   return String(raw ?? "").toLowerCase() === "outbound" ? "OUTBOUND" : "INBOUND";
@@ -92,7 +96,7 @@ export async function recordZoomCallLog(
       data.status = status;
     }
     if (hasRecording && !existing.recordingUrl) {
-      data.recordingUrl = `/api/leads/${existing.leadId}/calls/${existing.id}/recording`;
+      data.recordingUrl = recordingUrlFor(existing.leadId, existing.id);
     }
     if (Object.keys(data).length > 0) {
       await prisma.call.update({ where: { id: existing.id }, data });
@@ -109,15 +113,10 @@ export async function recordZoomCallLog(
     return "skipped";
   }
 
-  const lead = await findOrCreateLeadForContact({
-    organizationId,
-    phone: customerNumber,
-    displayName:
-      direction === "OUTBOUND"
-        ? (log.callee_name as string | undefined)
-        : (log.caller_name as string | undefined),
-    inboundSourceName: "Zoom Phone",
-  });
+  // Only attach to a lead that already exists — unlike WhatsApp/SMS/email,
+  // a Zoom call to/from a number with no matching lead shouldn't spawn one.
+  // It still gets logged (visible on the Calls page), just with no lead.
+  const lead = await findLeadForContact(organizationId, customerNumber);
 
   const dateTime = typeof log.date_time === "string" ? new Date(log.date_time) : new Date();
   const agentId = await resolveAgentId(organizationId, direction, log, logPrefix, callId);
@@ -125,7 +124,7 @@ export async function recordZoomCallLog(
   const call = await prisma.call.create({
     data: {
       organizationId,
-      leadId: lead.id,
+      leadId: lead?.id,
       agentId,
       direction,
       status,
@@ -140,22 +139,24 @@ export async function recordZoomCallLog(
   if (hasRecording) {
     await prisma.call.update({
       where: { id: call.id },
-      data: { recordingUrl: `/api/leads/${lead.id}/calls/${call.id}/recording` },
+      data: { recordingUrl: recordingUrlFor(lead?.id, call.id) },
     });
   }
 
-  const minutes = Math.floor(durationSec / 60);
-  const seconds = durationSec % 60;
-  await logActivity({
-    organizationId,
-    leadId: lead.id,
-    type: "CALL_LOGGED",
-    summary: `📞 ${direction === "OUTBOUND" ? "Outbound" : "Inbound"} Zoom call — ${status.toLowerCase()}${
-      status === "ANSWERED" ? ` (${minutes}:${seconds.toString().padStart(2, "0")})` : ""
-    }`,
-    metadata: { callId: call.id },
-  });
+  if (lead) {
+    const minutes = Math.floor(durationSec / 60);
+    const seconds = durationSec % 60;
+    await logActivity({
+      organizationId,
+      leadId: lead.id,
+      type: "CALL_LOGGED",
+      summary: `📞 ${direction === "OUTBOUND" ? "Outbound" : "Inbound"} Zoom call — ${status.toLowerCase()}${
+        status === "ANSWERED" ? ` (${minutes}:${seconds.toString().padStart(2, "0")})` : ""
+      }`,
+      metadata: { callId: call.id },
+    });
+  }
 
-  console.log(`${logPrefix} recorded call ${call.id} for lead ${lead.id}`);
+  console.log(`${logPrefix} recorded call ${call.id}${lead ? ` for lead ${lead.id}` : " (no matching lead)"}`);
   return "recorded";
 }
