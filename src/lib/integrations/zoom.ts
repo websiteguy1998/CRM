@@ -125,15 +125,25 @@ export async function getCallRecordingDownloadInfo(
   if (!config) return null;
   const token = await getAccessToken(config);
 
-  const res = await fetch(`https://api.zoom.us/v2/phone/call_logs/${encodeURIComponent(zoomCallId)}/recordings`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const recording = data.recordings?.[0];
-  if (!recording?.download_url) return null;
-  return { url: recording.download_url, token, contentType: recording.file_type };
+  // Zoom sunset /phone/call_logs/{id}/recordings alongside the rest of the
+  // call_logs API (Nov 2025) in favor of call_history — try that first,
+  // and fall back to the old path in case an account is still on it.
+  for (const url of [
+    `https://api.zoom.us/v2/phone/call_history/${encodeURIComponent(zoomCallId)}/recordings`,
+    `https://api.zoom.us/v2/phone/call_logs/${encodeURIComponent(zoomCallId)}/recordings`,
+  ]) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      console.log(`[zoom] recording lookup failed for ${zoomCallId} via ${url}: ${res.status} ${await res.text()}`);
+      continue;
+    }
+    const data = await res.json();
+    const recording = data.recordings?.[0];
+    if (recording?.download_url) {
+      return { url: recording.download_url, token, contentType: recording.file_type };
+    }
+  }
+  return null;
 }
 
 /**
