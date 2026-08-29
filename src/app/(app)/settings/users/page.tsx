@@ -5,6 +5,7 @@ import PageHeader from "@/components/page-header";
 import AddUserForm from "./add-user-form";
 import ApprovalActions from "./approval-actions";
 import EditUserDialog from "./edit-user-dialog";
+import DeleteUserButton from "./delete-user-button";
 import { relativeTime } from "@/lib/format";
 
 export default async function UsersSettingsPage() {
@@ -88,7 +89,10 @@ export default async function UsersSettingsPage() {
                   </td>
                   {session.role === "ADMIN" && (
                     <td className="px-4 py-2.5">
-                      <EditUserDialog userId={u.id} name={u.name} email={u.email} />
+                      <div className="flex items-center gap-3">
+                        <EditUserDialog userId={u.id} name={u.name} email={u.email} />
+                        {u.id !== session.sub && <DeleteUserButton userId={u.id} name={u.name} />}
+                      </div>
                     </td>
                   )}
                 </tr>

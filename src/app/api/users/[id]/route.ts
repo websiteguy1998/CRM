@@ -46,7 +46,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ user: updated });
 }
 
-/** Admin-only: reject a pending signup (delete the account request). */
+/**
+ * Admin-only: permanently remove a user (pending signup, or an active
+ * account someone wants gone). Every FK to User is nullable, so instead
+ * of blocking on "this user has leads/calls/activity", we detach them —
+ * owned leads become Unassigned, activity/notes/messages keep their
+ * content with no attributed actor, calls keep their recording/duration
+ * with no agent — then delete the user row itself. Nothing business-data
+ * gets deleted, only the user record.
+ */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
@@ -55,12 +63,34 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   }
   const { id } = await params;
 
-  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.orgId } });
-  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (user.active) {
-    return NextResponse.json({ error: "Deactivate the user instead of deleting an active account" }, { status: 400 });
+  if (id === auth.session.sub) {
+    return NextResponse.json({ error: "You can't delete your own account" }, { status: 400 });
   }
 
-  await prisma.user.delete({ where: { id } });
+  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.orgId } });
+  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (user.role === "ADMIN") {
+    const otherActiveAdmins = await prisma.user.count({
+      where: { organizationId: auth.session.orgId, role: "ADMIN", active: true, id: { not: id } },
+    });
+    if (otherActiveAdmins === 0) {
+      return NextResponse.json({ error: "Can't delete the last active admin" }, { status: 400 });
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.teamMember.deleteMany({ where: { userId: id } }),
+    prisma.lead.updateMany({ where: { ownerId: id }, data: { ownerId: null } }),
+    prisma.lead.updateMany({ where: { createdById: id }, data: { createdById: null } }),
+    prisma.leadStageHistory.updateMany({ where: { changedById: id }, data: { changedById: null } }),
+    prisma.task.updateMany({ where: { assignedToId: id }, data: { assignedToId: null } }),
+    prisma.note.updateMany({ where: { authorId: id }, data: { authorId: null } }),
+    prisma.activity.updateMany({ where: { actorId: id }, data: { actorId: null } }),
+    prisma.call.updateMany({ where: { agentId: id }, data: { agentId: null } }),
+    prisma.message.updateMany({ where: { sentById: id }, data: { sentById: null } }),
+    prisma.user.delete({ where: { id } }),
+  ]);
+
   return NextResponse.json({ ok: true });
 }
