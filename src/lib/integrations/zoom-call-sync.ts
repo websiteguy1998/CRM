@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { findLeadForContact } from "@/lib/inbound";
 import { logActivity } from "@/lib/timeline";
-import { getPhoneUserEmail } from "@/lib/integrations/zoom";
+import { getZoomUserInfo } from "@/lib/integrations/zoom";
 import type { CallDirection, CallStatus } from "@prisma/client";
 
 function recordingUrlFor(leadId: string | null | undefined, callId: string) {
@@ -46,11 +46,14 @@ async function resolveAgentId(
   const agentZoomUserId = String((direction === "OUTBOUND" ? log.caller_user_id : log.callee_user_id) ?? "");
   if (!agentZoomUserId) return undefined;
   try {
-    const email = await getPhoneUserEmail(organizationId, agentZoomUserId);
+    const { email, phoneNumber } = await getZoomUserInfo(organizationId, agentZoomUserId);
     if (!email) return undefined;
     const agent = await prisma.user.findFirst({
       where: { organizationId, zoomUserEmail: { equals: email, mode: "insensitive" } },
     });
+    if (agent && phoneNumber && agent.zoomPhoneNumber !== phoneNumber) {
+      await prisma.user.update({ where: { id: agent.id }, data: { zoomPhoneNumber: phoneNumber } });
+    }
     return agent?.id;
   } catch (err) {
     console.log(`${logPrefix} could not resolve agent for call ${callId}:`, err instanceof Error ? err.message : err);

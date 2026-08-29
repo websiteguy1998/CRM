@@ -58,6 +58,11 @@ model User {
   // The Zoom account (usually their work email) this agent places
   // click-to-call calls from. Self-service — set from the Call tab.
   zoomUserEmail  String?
+  // The Zoom Phone number assigned to zoomUserEmail in Zoom's own admin
+  // panel. We don't set this — it's filled in automatically the first
+  // time a synced call resolves this agent, purely for display (Settings
+  // -> Users) so an admin can see the number-to-agent mapping.
+  zoomPhoneNumber String?
   createdAt      DateTime @default(now())
 
   teamMemberships TeamMember[]

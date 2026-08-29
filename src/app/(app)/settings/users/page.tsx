@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
@@ -13,6 +14,7 @@ export default async function UsersSettingsPage() {
   const users = await prisma.user.findMany({
     where: { organizationId: session.orgId },
     orderBy: { createdAt: "asc" },
+    include: { _count: { select: { calls: true } } },
   });
   const pending = users.filter((u) => !u.active);
   const active = users.filter((u) => u.active);
@@ -58,6 +60,8 @@ export default async function UsersSettingsPage() {
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Role</th>
                 <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">Zoom number</th>
+                <th className="px-4 py-2 font-medium">Calls</th>
                 {session.role === "ADMIN" && <th className="px-4 py-2 font-medium"></th>}
               </tr>
             </thead>
@@ -69,6 +73,18 @@ export default async function UsersSettingsPage() {
                   <td className="px-4 py-2.5 text-slate-600">{u.role}</td>
                   <td className="px-4 py-2.5">
                     <span className="badge bg-emerald-100 text-emerald-700">Active</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-600">
+                    {u.zoomPhoneNumber ?? (u.zoomUserEmail ? "Not yet synced" : "—")}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {u._count.calls > 0 ? (
+                      <Link href={`/calls?agentId=${u.id}`} className="text-indigo-600 hover:underline">
+                        {u._count.calls}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-400">0</span>
+                    )}
                   </td>
                   {session.role === "ADMIN" && (
                     <td className="px-4 py-2.5">

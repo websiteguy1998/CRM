@@ -70,32 +70,44 @@ export async function clickToCall(organizationId: string, agentZoomEmail: string
 
 /**
  * Resolves a Zoom Phone user id (as seen in call-log entries, e.g.
- * caller_user_id/callee_user_id) to that user's email, so we can match it
- * against User.zoomUserEmail and attribute the call to the right agent.
- * Cached briefly since the same handful of agents place most calls.
+ * caller_user_id/callee_user_id) to that user's email and assigned phone
+ * number, so we can match the email against User.zoomUserEmail to
+ * attribute the call to the right agent, and show the number next to
+ * them in Settings -> Users. Cached briefly since the same handful of
+ * agents place most calls.
  */
-const phoneUserEmailCache = new Map<string, { email: string | null; expiresAt: number }>();
+type ZoomUserInfo = { email: string | null; phoneNumber: string | null };
+const phoneUserInfoCache = new Map<string, { info: ZoomUserInfo; expiresAt: number }>();
 
-export async function getPhoneUserEmail(organizationId: string, zoomUserId: string): Promise<string | null> {
+export async function getZoomUserInfo(organizationId: string, zoomUserId: string): Promise<ZoomUserInfo> {
   const cacheKey = `${organizationId}:${zoomUserId}`;
-  const cached = phoneUserEmailCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.email;
+  const cached = phoneUserInfoCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.info;
 
+  const empty: ZoomUserInfo = { email: null, phoneNumber: null };
   const config = await getZoomConfig(organizationId);
-  if (!config) return null;
+  if (!config) return empty;
   const token = await getAccessToken(config);
 
   const res = await fetch(`https://api.zoom.us/v2/phone/users/${encodeURIComponent(zoomUserId)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    phoneUserEmailCache.set(cacheKey, { email: null, expiresAt: Date.now() + 5 * 60 * 1000 });
-    return null;
+    phoneUserInfoCache.set(cacheKey, { info: empty, expiresAt: Date.now() + 5 * 60 * 1000 });
+    return empty;
   }
   const data = await res.json();
-  const email = typeof data.email === "string" ? data.email : null;
-  phoneUserEmailCache.set(cacheKey, { email, expiresAt: Date.now() + 60 * 60 * 1000 });
-  return email;
+  const info: ZoomUserInfo = {
+    email: typeof data.email === "string" ? data.email : null,
+    phoneNumber:
+      typeof data.phone_number === "string"
+        ? data.phone_number
+        : (Array.isArray(data.phone_numbers) && typeof data.phone_numbers[0]?.number === "string"
+            ? data.phone_numbers[0].number
+            : null),
+  };
+  phoneUserInfoCache.set(cacheKey, { info, expiresAt: Date.now() + 60 * 60 * 1000 });
+  return info;
 }
 
 /**
