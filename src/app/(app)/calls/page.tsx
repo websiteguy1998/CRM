@@ -39,6 +39,7 @@ export default async function CallsPage() {
                 <th className="px-4 py-2 font-medium">Direction</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Duration</th>
+                <th className="px-4 py-2 font-medium">Recording</th>
                 <th className="px-4 py-2 font-medium">Next action</th>
                 <th className="px-4 py-2 font-medium">When</th>
               </tr>
@@ -62,6 +63,13 @@ export default async function CallsPage() {
                     <td className="px-4 py-2.5 text-slate-600">
                       {call.status === "ANSWERED" ? `${minutes}:${seconds.toString().padStart(2, "0")}` : "—"}
                     </td>
+                    <td className="px-4 py-2.5">
+                      {call.recordingUrl ? (
+                        <audio controls preload="none" src={call.recordingUrl} className="h-8 w-40" />
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-slate-600">{call.nextAction ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-400">{formatDateTime(call.startedAt)}</td>
                   </tr>
@@ -69,7 +77,7 @@ export default async function CallsPage() {
               })}
               {calls.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
                     No calls logged yet. Log one from a lead&apos;s profile.
                   </td>
                 </tr>

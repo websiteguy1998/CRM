@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Import failed" }, { status: 502 });
   }
 
+  if (logs[0]) {
+    console.log("[zoom backfill] sample call log entry:", JSON.stringify(logs[0]));
+  }
+
   let recorded = 0;
   let duplicate = 0;
   let skipped = 0;
