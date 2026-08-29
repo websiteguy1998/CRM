@@ -23,7 +23,7 @@ export default function ZoomBackfillButton() {
         return;
       }
       setMessage(
-        `Found ${data.total} call(s) from the last 90 days — added ${data.recorded} new, ${data.duplicate} already on file.`
+        `Found ${data.total} call(s) from the last 90 days — added ${data.recorded} new, updated ${data.updated} with newer info.`
       );
       router.refresh();
     } finally {

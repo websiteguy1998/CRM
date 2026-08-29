@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { findLeadForContact } from "@/lib/inbound";
 import { logActivity } from "@/lib/timeline";
-import { getZoomUserInfo } from "@/lib/integrations/zoom";
+import { getZoomUserInfo, fetchCallHistory } from "@/lib/integrations/zoom";
 import type { CallDirection, CallStatus } from "@prisma/client";
 
 function recordingUrlFor(leadId: string | null | undefined, callId: string) {
@@ -75,7 +75,7 @@ export async function recordZoomCallLog(
   organizationId: string,
   log: Record<string, unknown>,
   logPrefix = "[zoom]"
-): Promise<"recorded" | "skipped" | "duplicate"> {
+): Promise<"recorded" | "skipped" | "updated" | "unchanged"> {
   const callId = String(log.call_id ?? log.id ?? "");
   if (!callId) {
     console.log(`${logPrefix} skipped: no call_id/id in payload`, JSON.stringify(log).slice(0, 500));
@@ -104,8 +104,9 @@ export async function recordZoomCallLog(
     if (Object.keys(data).length > 0) {
       await prisma.call.update({ where: { id: existing.id }, data });
       console.log(`${logPrefix} updated call ${existing.id} with more complete data`, JSON.stringify(data));
+      return "updated";
     }
-    return "duplicate";
+    return "unchanged";
   }
 
   const callerNumber = externalNumber(log, "caller");
@@ -162,4 +163,31 @@ export async function recordZoomCallLog(
 
   console.log(`${logPrefix} recorded call ${call.id}${lead ? ` for lead ${lead.id}` : " (no matching lead)"}`);
   return "recorded";
+}
+
+/**
+ * Pulls Zoom's call history for the last `days` days and runs every entry
+ * through recordZoomCallLog. Used both for the admin's manual "Import past
+ * calls" (a large window) and a lightweight recent-window sync that runs
+ * automatically when someone opens the Calls page — Zoom's webhook often
+ * fires the moment a call connects, before duration/recording are final,
+ * and (on at least some accounts) never fires again once they are, so
+ * without this a fresh call can get stuck showing 0:00 with no recording
+ * until someone happens to re-pull it from the REST API, which has the
+ * finished data a little after the call ends.
+ */
+export async function syncZoomCallHistory(organizationId: string, days: number, logPrefix: string) {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+  const logs = await fetchCallHistory(organizationId, {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  });
+
+  const tally = { recorded: 0, updated: 0, unchanged: 0, skipped: 0 };
+  for (const log of logs) {
+    const outcome = await recordZoomCallLog(organizationId, log, logPrefix);
+    tally[outcome] += 1;
+  }
+  return { total: logs.length, ...tally };
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
+import PendingCallSync from "@/components/pending-call-sync";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
 import { formatDateTime, localDateBoundary } from "@/lib/format";
 import { hasFullLeadVisibility, leadWhereForSession } from "@/lib/access";
@@ -83,6 +84,7 @@ export default async function CallsPage({
 
   return (
     <div>
+      <PendingCallSync />
       <PageHeader
         title="Calls"
         description="Zoom Phone call log — click-to-call and recordings appear here once Zoom is connected in Settings."

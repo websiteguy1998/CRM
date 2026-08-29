@@ -8,6 +8,7 @@ import StageSelector from "@/components/stage-selector";
 import OwnerSelector from "@/components/owner-selector";
 import LeadActions from "@/components/lead-actions";
 import LeadDetailsEditor from "@/components/lead-details-editor";
+import PendingCallSync from "@/components/pending-call-sync";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
 import type { ActivityType } from "@prisma/client";
@@ -60,6 +61,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="pb-10">
+      <PendingCallSync />
       <PageHeader
         title={`${lead.contact.firstName} ${lead.contact.lastName ?? ""}`.trim()}
         description={lead.company?.name ?? undefined}
