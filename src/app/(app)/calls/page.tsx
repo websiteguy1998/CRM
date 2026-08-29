@@ -2,8 +2,10 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { formatDateTime } from "@/lib/format";
-import { leadWhereForSession } from "@/lib/access";
+import TimezoneOffsetInput from "@/components/timezone-offset-input";
+import { formatDateTime, localDateBoundary } from "@/lib/format";
+import { hasFullLeadVisibility, leadWhereForSession } from "@/lib/access";
+import type { CallDirection, CallStatus, Prisma } from "@prisma/client";
 
 const STATUS_COLOR: Record<string, string> = {
   ANSWERED: "bg-emerald-100 text-emerald-700",
@@ -12,16 +14,64 @@ const STATUS_COLOR: Record<string, string> = {
   VOICEMAIL: "bg-slate-100 text-slate-600",
 };
 
-export default async function CallsPage() {
+export default async function CallsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string;
+    agentId?: string;
+    direction?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    tzOffset?: string;
+  }>;
+}) {
   const session = await getSession();
   if (!session) return null;
+  const { q, agentId, direction, status, from, to, tzOffset } = await searchParams;
+  const tzOffsetMinutes = Number(tzOffset) || 0;
+  const fullVisibility = hasFullLeadVisibility(session.role);
 
-  const calls = await prisma.call.findMany({
-    where: { organizationId: session.orgId, lead: leadWhereForSession(session) },
-    include: { lead: { include: { contact: true } }, agent: true },
-    orderBy: { startedAt: "desc" },
-    take: 200,
-  });
+  const [calls, agents] = await Promise.all([
+    prisma.call.findMany({
+      where: {
+        organizationId: session.orgId,
+        lead: leadWhereForSession(session),
+        ...(fullVisibility && agentId ? { agentId } : {}),
+        ...(direction ? { direction: direction as CallDirection } : {}),
+        ...(status ? { status: status as CallStatus } : {}),
+        ...(fullVisibility && (from || to)
+          ? {
+              startedAt: {
+                ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
+                ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
+              },
+            }
+          : {}),
+        ...(q
+          ? {
+              lead: {
+                ...leadWhereForSession(session),
+                contact: {
+                  OR: [
+                    { firstName: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                    { phone: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                    { email: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                  ],
+                },
+              },
+            }
+          : {}),
+      },
+      include: { lead: { include: { contact: true } }, agent: true },
+      orderBy: { startedAt: "desc" },
+      take: 200,
+    }),
+    fullVisibility
+      ? prisma.user.findMany({ where: { organizationId: session.orgId, active: true, calls: { some: {} } } })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <div>
@@ -30,6 +80,45 @@ export default async function CallsPage() {
         description="Zoom Phone call log — click-to-call and recordings appear here once Zoom is connected in Settings."
       />
       <div className="p-6">
+        <form className="mb-4 flex flex-wrap gap-2" method="GET">
+          <TimezoneOffsetInput />
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Search lead, phone, email…"
+            className="input max-w-xs"
+          />
+          <select name="direction" defaultValue={direction ?? ""} className="input max-w-[150px]">
+            <option value="">All directions</option>
+            <option value="OUTBOUND">Outbound</option>
+            <option value="INBOUND">Inbound</option>
+          </select>
+          <select name="status" defaultValue={status ?? ""} className="input max-w-[150px]">
+            <option value="">All statuses</option>
+            <option value="ANSWERED">Answered</option>
+            <option value="MISSED">Missed</option>
+            <option value="NO_ANSWER">No answer</option>
+            <option value="VOICEMAIL">Voicemail</option>
+          </select>
+          {fullVisibility && (
+            <>
+              <select name="agentId" defaultValue={agentId ?? ""} className="input max-w-[160px]">
+                <option value="">All agents</option>
+                {agents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <input type="date" name="from" defaultValue={from} className="input max-w-[150px]" />
+              <input type="date" name="to" defaultValue={to} className="input max-w-[150px]" />
+            </>
+          )}
+          <button type="submit" className="btn-secondary">
+            Filter
+          </button>
+        </form>
+
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
