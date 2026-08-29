@@ -38,40 +38,47 @@ export default async function CallsPage({
     prisma.call.findMany({
       where: {
         organizationId: session.orgId,
-        // Full-visibility roles also see calls that never matched a lead
-        // (no owner to check); everyone else only sees calls on leads
-        // they're allowed to see, which excludes leadless calls entirely.
-        ...(fullVisibility ? {} : { lead: leadWhereForSession(session) }),
-        ...(fullVisibility && agentId ? { agentId } : {}),
-        ...(direction ? { direction: direction as CallDirection } : {}),
-        ...(status ? { status: status as CallStatus } : {}),
-        ...(fullVisibility && (from || to)
-          ? {
-              startedAt: {
-                ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
-                ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
-              },
-            }
-          : {}),
-        ...(q
-          ? {
-              OR: [
-                { fromNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                { toNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                {
-                  lead: {
-                    contact: {
-                      OR: [
-                        { firstName: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                        { phone: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                        { email: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-                      ],
+        AND: [
+          // Full-visibility roles see everything, including calls that
+          // never matched a lead. Everyone else sees calls on leads
+          // they're allowed to see, PLUS any call they personally
+          // placed/received themselves (agentId) even if that lead isn't
+          // (yet) assigned to them or there's no lead at all — otherwise
+          // an agent's own calls could be invisible to them. This has to
+          // be its own AND entry (not merged as a sibling key) because
+          // the search filter below also needs an OR of its own.
+          fullVisibility ? {} : { OR: [{ lead: leadWhereForSession(session) }, { agentId: session.sub }] },
+          fullVisibility && agentId ? { agentId } : {},
+          direction ? { direction: direction as CallDirection } : {},
+          status ? { status: status as CallStatus } : {},
+          fullVisibility && (from || to)
+            ? {
+                startedAt: {
+                  ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
+                  ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
+                },
+              }
+            : {},
+          q
+            ? {
+                OR: [
+                  { fromNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                  { toNumber: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                  {
+                    lead: {
+                      contact: {
+                        OR: [
+                          { firstName: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                          { phone: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                          { email: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                        ],
+                      },
                     },
                   },
-                },
-              ],
-            }
-          : {}),
+                ],
+              }
+            : {},
+        ],
       },
       include: { lead: { include: { contact: true } }, agent: true },
       orderBy: { startedAt: "desc" },
