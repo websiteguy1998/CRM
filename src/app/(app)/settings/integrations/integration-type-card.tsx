@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CheckEmailButton from "./check-email-button";
 import ZoomBackfillButton from "./zoom-backfill-button";
+import ZoomCleanupButton from "./zoom-cleanup-button";
 
 type FieldDef = { key: string; label: string; placeholder?: string; secret?: boolean };
 
@@ -144,8 +145,9 @@ export default function IntegrationTypeCard({
       )}
 
       {type === "ZOOM_PHONE" && accounts.some((a) => a.status === "CONNECTED") && (
-        <div className="mb-3 border-t border-slate-100 pt-3">
+        <div className="mb-3 space-y-2 border-t border-slate-100 pt-3">
           <ZoomBackfillButton />
+          <ZoomCleanupButton />
         </div>
       )}
 
