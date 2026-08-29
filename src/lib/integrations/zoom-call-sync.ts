@@ -57,9 +57,12 @@ async function resolveAgentId(
 /**
  * Turns one Zoom call-log entry (from either the webhook or the call
  * history REST API — both use the same field names) into a Call record on
- * the matching lead. Dedupes on Zoom's call_id, so it's safe to run the
- * same log through this twice (webhook + a later backfill, or two backfill
- * runs over an overlapping date range).
+ * the matching lead. Dedupes on Zoom's call_id — but Zoom fires this event
+ * twice per call (once from the caller's side, once from the callee's),
+ * and the first one to arrive is often sent right as the call connects,
+ * before duration/recording are final. So a duplicate isn't just skipped:
+ * whichever event carries more complete data (longer duration, or a
+ * recording the first one didn't have) updates the existing record.
  */
 export async function recordZoomCallLog(
   organizationId: string,
@@ -73,12 +76,27 @@ export async function recordZoomCallLog(
   }
 
   const direction = mapDirection(log.direction);
+  const durationSec = Number(log.duration ?? 0) || 0;
+  const status = mapStatus(log.result, durationSec);
+  const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
 
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
   if (existing) {
+    const data: Record<string, unknown> = {};
     if (!existing.agentId) {
       const agentId = await resolveAgentId(organizationId, direction, log, logPrefix, callId);
-      if (agentId) await prisma.call.update({ where: { id: existing.id }, data: { agentId } });
+      if (agentId) data.agentId = agentId;
+    }
+    if (durationSec > existing.durationSec) {
+      data.durationSec = durationSec;
+      data.status = status;
+    }
+    if (hasRecording && !existing.recordingUrl) {
+      data.recordingUrl = `/api/leads/${existing.leadId}/calls/${existing.id}/recording`;
+    }
+    if (Object.keys(data).length > 0) {
+      await prisma.call.update({ where: { id: existing.id }, data });
+      console.log(`${logPrefix} updated call ${existing.id} with more complete data`, JSON.stringify(data));
     }
     return "duplicate";
   }
@@ -101,11 +119,7 @@ export async function recordZoomCallLog(
     inboundSourceName: "Zoom Phone",
   });
 
-  const durationSec = Number(log.duration ?? 0) || 0;
-  const status = mapStatus(log.result, durationSec);
   const dateTime = typeof log.date_time === "string" ? new Date(log.date_time) : new Date();
-  const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
-
   const agentId = await resolveAgentId(organizationId, direction, log, logPrefix, callId);
 
   const call = await prisma.call.create({
