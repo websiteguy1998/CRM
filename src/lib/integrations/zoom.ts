@@ -69,6 +69,36 @@ export async function clickToCall(organizationId: string, agentZoomEmail: string
 }
 
 /**
+ * Resolves a Zoom Phone user id (as seen in call-log entries, e.g.
+ * caller_user_id/callee_user_id) to that user's email, so we can match it
+ * against User.zoomUserEmail and attribute the call to the right agent.
+ * Cached briefly since the same handful of agents place most calls.
+ */
+const phoneUserEmailCache = new Map<string, { email: string | null; expiresAt: number }>();
+
+export async function getPhoneUserEmail(organizationId: string, zoomUserId: string): Promise<string | null> {
+  const cacheKey = `${organizationId}:${zoomUserId}`;
+  const cached = phoneUserEmailCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.email;
+
+  const config = await getZoomConfig(organizationId);
+  if (!config) return null;
+  const token = await getAccessToken(config);
+
+  const res = await fetch(`https://api.zoom.us/v2/phone/users/${encodeURIComponent(zoomUserId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    phoneUserEmailCache.set(cacheKey, { email: null, expiresAt: Date.now() + 5 * 60 * 1000 });
+    return null;
+  }
+  const data = await res.json();
+  const email = typeof data.email === "string" ? data.email : null;
+  phoneUserEmailCache.set(cacheKey, { email, expiresAt: Date.now() + 60 * 60 * 1000 });
+  return email;
+}
+
+/**
  * Looks up the downloadable recording for a finished call (by Zoom's
  * call_id) and returns the Zoom-hosted URL plus the bearer token needed to
  * fetch it — Zoom's recording URLs require that same Authorization header,

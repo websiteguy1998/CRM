@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { findOrCreateLeadForContact } from "@/lib/inbound";
 import { logActivity } from "@/lib/timeline";
+import { getPhoneUserEmail } from "@/lib/integrations/zoom";
 import type { CallDirection, CallStatus } from "@prisma/client";
 
 function mapDirection(raw: unknown): CallDirection {
@@ -73,10 +74,30 @@ export async function recordZoomCallLog(
   const dateTime = typeof log.date_time === "string" ? new Date(log.date_time) : new Date();
   const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
 
+  // The internal party (whichever side isn't the external customer) is
+  // identified by a Zoom user id, not an email — resolve it and match
+  // against User.zoomUserEmail so the call shows up under the right agent.
+  const agentZoomUserId = String((direction === "OUTBOUND" ? log.caller_user_id : log.callee_user_id) ?? "");
+  let agentId: string | undefined;
+  if (agentZoomUserId) {
+    try {
+      const email = await getPhoneUserEmail(organizationId, agentZoomUserId);
+      if (email) {
+        const agent = await prisma.user.findFirst({
+          where: { organizationId, zoomUserEmail: { equals: email, mode: "insensitive" } },
+        });
+        agentId = agent?.id;
+      }
+    } catch (err) {
+      console.log(`${logPrefix} could not resolve agent for call ${callId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
   const call = await prisma.call.create({
     data: {
       organizationId,
       leadId: lead.id,
+      agentId,
       direction,
       status,
       fromNumber: callerNumber,
