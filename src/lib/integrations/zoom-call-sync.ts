@@ -22,6 +22,19 @@ function mapStatus(result: unknown, durationSec: number): CallStatus {
   return "MISSED";
 }
 
+/** Zoom's REST call-history endpoint reports duration as "HH:MM:SS" (or "MM:SS"); the webhook sends a raw second count. Handle both. */
+function parseDurationSeconds(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, Math.round(raw));
+  if (typeof raw !== "string") return 0;
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  const parts = trimmed.split(":").map(Number);
+  if (parts.length > 1 && parts.every((p) => Number.isFinite(p))) {
+    return parts.reduce((total, part) => total * 60 + part, 0);
+  }
+  return 0;
+}
+
 /** Zoom's external party is identified by a DID number; the internal party is an extension/user id, not a phone number. */
 function externalNumber(log: Record<string, unknown>, side: "caller" | "callee"): string | undefined {
   const didKey = `${side}_did_number`;
@@ -83,9 +96,13 @@ export async function recordZoomCallLog(
   }
 
   const direction = mapDirection(log.direction);
-  const durationSec = Number(log.duration ?? 0) || 0;
+  const durationSec = parseDurationSeconds(log.duration);
   const status = mapStatus(log.result, durationSec);
   const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
+
+  if (hasRecording && durationSec === 0) {
+    console.log(`${logPrefix} has a recording but parsed duration 0 for call ${callId} — raw log:`, JSON.stringify(log));
+  }
 
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
   if (existing) {
