@@ -35,13 +35,32 @@ function parseDurationSeconds(raw: unknown): number {
   return 0;
 }
 
-/** Zoom's external party is identified by a DID number; the internal party is an extension/user id, not a phone number. */
+const PHONE_LIKE = /^\+?[\d\s().-]{7,20}$/;
+
+/**
+ * Zoom's exact field name for the external party's phone number has
+ * turned out to vary (did_number on one payload shape, something else on
+ * another) — rather than keep chasing exact names, scan every
+ * "<side>_*" field for one whose value actually looks like a phone
+ * number, skipping <side>_ext_number specifically since that's the
+ * internal extension (e.g. "800"), not a customer's number.
+ */
 function externalNumber(log: Record<string, unknown>, side: "caller" | "callee"): string | undefined {
-  const didKey = `${side}_did_number`;
-  const numberKey = `${side}_number`;
-  if (typeof log[didKey] === "string") return log[didKey] as string;
-  if (typeof log[numberKey] === "string") return log[numberKey] as string;
+  const prefix = `${side}_`;
+  for (const [key, value] of Object.entries(log)) {
+    if (!key.startsWith(prefix) || key === `${prefix}ext_number`) continue;
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed.length >= 7 && PHONE_LIKE.test(trimmed)) return trimmed;
+  }
   return undefined;
+}
+
+/** Same reasoning as externalNumber — scan for any recording-shaped field instead of guessing its exact name. */
+function hasRecording(log: Record<string, unknown>): boolean {
+  return Object.entries(log).some(
+    ([key, value]) => /recording/i.test(key) && Boolean(value) && value !== "false" && value !== "0"
+  );
 }
 
 /**
@@ -98,11 +117,7 @@ export async function recordZoomCallLog(
   const direction = mapDirection(log.direction);
   const durationSec = parseDurationSeconds(log.duration);
   const status = mapStatus(log.result, durationSec);
-  const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
-
-  if (hasRecording && durationSec === 0) {
-    console.log(`${logPrefix} has a recording but parsed duration 0 for call ${callId} — raw log:`, JSON.stringify(log));
-  }
+  const recorded = hasRecording(log);
 
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
   if (existing) {
@@ -115,7 +130,7 @@ export async function recordZoomCallLog(
       data.durationSec = durationSec;
       data.status = status;
     }
-    if (hasRecording && !existing.recordingUrl) {
+    if (recorded && !existing.recordingUrl) {
       data.recordingUrl = recordingUrlFor(existing.leadId, existing.id);
     }
     if (Object.keys(data).length > 0) {
@@ -157,7 +172,7 @@ export async function recordZoomCallLog(
     },
   });
 
-  if (hasRecording) {
+  if (recorded) {
     await prisma.call.update({
       where: { id: call.id },
       data: { recordingUrl: recordingUrlFor(lead?.id, call.id) },
