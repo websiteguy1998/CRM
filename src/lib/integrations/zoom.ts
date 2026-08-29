@@ -94,6 +94,44 @@ export async function getCallRecordingDownloadInfo(
   return { url: recording.download_url, token, contentType: recording.file_type };
 }
 
+/**
+ * Fetches completed call log entries for the account over a date range,
+ * paginating through Zoom's call history API. Used for a one-time backfill
+ * of calls that happened before the webhook was connected — ongoing sync
+ * relies on the webhook instead, since polling this on every request
+ * would be far slower and rate-limit-prone.
+ */
+export async function fetchCallHistory(
+  organizationId: string,
+  range: { from: string; to: string }
+): Promise<Record<string, unknown>[]> {
+  const config = await getZoomConfig(organizationId);
+  if (!config) {
+    throw new Error("Zoom Phone isn't connected yet — add it in Settings → Integrations.");
+  }
+  const token = await getAccessToken(config);
+
+  const logs: Record<string, unknown>[] = [];
+  let nextPageToken = "";
+  let pages = 0;
+  do {
+    const params = new URLSearchParams({ page_size: "300", from: range.from, to: range.to });
+    if (nextPageToken) params.set("next_page_token", nextPageToken);
+    const res = await fetch(`https://api.zoom.us/v2/phone/call_history?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error(`Zoom call history request failed: ${res.status} ${await res.text()}`);
+    }
+    const data = await res.json();
+    logs.push(...(Array.isArray(data.call_logs) ? data.call_logs : []));
+    nextPageToken = typeof data.next_page_token === "string" ? data.next_page_token : "";
+    pages += 1;
+  } while (nextPageToken && pages < 50);
+
+  return logs;
+}
+
 /** Zoom's webhook URL-validation handshake — echoes back an HMAC of their challenge token. */
 export function computeZoomChallengeResponse(plainToken: string, secretToken: string) {
   return crypto.createHmac("sha256", secretToken).update(plainToken).digest("hex");
