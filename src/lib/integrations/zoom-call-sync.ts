@@ -28,6 +28,33 @@ function externalNumber(log: Record<string, unknown>, side: "caller" | "callee")
 }
 
 /**
+ * The internal party (whichever side isn't the external customer) is
+ * identified by a Zoom user id, not an email — resolve it and match
+ * against User.zoomUserEmail so the call shows up under the right agent.
+ */
+async function resolveAgentId(
+  organizationId: string,
+  direction: CallDirection,
+  log: Record<string, unknown>,
+  logPrefix: string,
+  callId: string
+): Promise<string | undefined> {
+  const agentZoomUserId = String((direction === "OUTBOUND" ? log.caller_user_id : log.callee_user_id) ?? "");
+  if (!agentZoomUserId) return undefined;
+  try {
+    const email = await getPhoneUserEmail(organizationId, agentZoomUserId);
+    if (!email) return undefined;
+    const agent = await prisma.user.findFirst({
+      where: { organizationId, zoomUserEmail: { equals: email, mode: "insensitive" } },
+    });
+    return agent?.id;
+  } catch (err) {
+    console.log(`${logPrefix} could not resolve agent for call ${callId}:`, err instanceof Error ? err.message : err);
+    return undefined;
+  }
+}
+
+/**
  * Turns one Zoom call-log entry (from either the webhook or the call
  * history REST API — both use the same field names) into a Call record on
  * the matching lead. Dedupes on Zoom's call_id, so it's safe to run the
@@ -45,12 +72,17 @@ export async function recordZoomCallLog(
     return "skipped";
   }
 
+  const direction = mapDirection(log.direction);
+
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
   if (existing) {
+    if (!existing.agentId) {
+      const agentId = await resolveAgentId(organizationId, direction, log, logPrefix, callId);
+      if (agentId) await prisma.call.update({ where: { id: existing.id }, data: { agentId } });
+    }
     return "duplicate";
   }
 
-  const direction = mapDirection(log.direction);
   const callerNumber = externalNumber(log, "caller");
   const calleeNumber = externalNumber(log, "callee");
   const customerNumber = direction === "OUTBOUND" ? calleeNumber : callerNumber;
@@ -74,24 +106,7 @@ export async function recordZoomCallLog(
   const dateTime = typeof log.date_time === "string" ? new Date(log.date_time) : new Date();
   const hasRecording = Boolean(log.recording_id ?? log.has_recording ?? log.recording_type);
 
-  // The internal party (whichever side isn't the external customer) is
-  // identified by a Zoom user id, not an email — resolve it and match
-  // against User.zoomUserEmail so the call shows up under the right agent.
-  const agentZoomUserId = String((direction === "OUTBOUND" ? log.caller_user_id : log.callee_user_id) ?? "");
-  let agentId: string | undefined;
-  if (agentZoomUserId) {
-    try {
-      const email = await getPhoneUserEmail(organizationId, agentZoomUserId);
-      if (email) {
-        const agent = await prisma.user.findFirst({
-          where: { organizationId, zoomUserEmail: { equals: email, mode: "insensitive" } },
-        });
-        agentId = agent?.id;
-      }
-    } catch (err) {
-      console.log(`${logPrefix} could not resolve agent for call ${callId}:`, err instanceof Error ? err.message : err);
-    }
-  }
+  const agentId = await resolveAgentId(organizationId, direction, log, logPrefix, callId);
 
   const call = await prisma.call.create({
     data: {
