@@ -47,6 +47,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         campaign: true,
         deals: true,
         calls: { orderBy: { startedAt: "desc" } },
+        notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
         tasks: { orderBy: { dueAt: "asc" } },
         activities: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },
@@ -199,6 +200,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     {c.recordingUrl && (
                       <audio controls preload="none" src={c.recordingUrl} className="mt-2 h-8 w-full" />
                     )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {lead.notes.length > 0 && (
+            <div className="card p-4">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Notes</h2>
+              <ul className="space-y-3 text-sm">
+                {lead.notes.map((n) => (
+                  <li key={n.id} className="border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                    <p className="whitespace-pre-wrap text-slate-800">{n.body}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {n.author?.name ?? "Unknown"} · {relativeTime(n.createdAt)}
+                    </p>
                   </li>
                 ))}
               </ul>

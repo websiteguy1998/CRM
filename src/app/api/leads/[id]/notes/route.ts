@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     organizationId: orgId,
     leadId: id,
     type: "NOTE_ADDED",
-    summary: "Note added",
+    summary: `📝 ${parsed.data.body.slice(0, 140)}`,
     actorId: sub,
     metadata: { noteId: note.id },
   });
