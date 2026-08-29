@@ -67,6 +67,10 @@ function hasRecording(log: Record<string, unknown>): boolean {
  * The internal party (whichever side isn't the external customer) is
  * identified by a Zoom user id, not an email — resolve it and match
  * against User.zoomUserEmail so the call shows up under the right agent.
+ * Falls back to the user's CRM login email when zoomUserEmail hasn't been
+ * set, since for most agents the two are the same account — that way
+ * attribution works out of the box without the self-service step, but an
+ * explicit zoomUserEmail (for anyone whose Zoom login differs) still wins.
  */
 async function resolveAgentId(
   organizationId: string,
@@ -81,7 +85,13 @@ async function resolveAgentId(
     const { email, phoneNumber } = await getZoomUserInfo(organizationId, agentZoomUserId);
     if (!email) return undefined;
     const agent = await prisma.user.findFirst({
-      where: { organizationId, zoomUserEmail: { equals: email, mode: "insensitive" } },
+      where: {
+        organizationId,
+        OR: [
+          { zoomUserEmail: { equals: email, mode: "insensitive" } },
+          { zoomUserEmail: null, email: { equals: email, mode: "insensitive" } },
+        ],
+      },
     });
     if (agent && phoneNumber && agent.zoomPhoneNumber !== phoneNumber) {
       await prisma.user.update({ where: { id: agent.id }, data: { zoomPhoneNumber: phoneNumber } });
