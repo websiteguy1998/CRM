@@ -22,7 +22,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cal
     return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
   }
 
-  const info = await getCallRecordingDownloadInfo(auth.session.orgId, call.externalId);
+  const info = await getCallRecordingDownloadInfo(auth.session.orgId, {
+    callId: call.externalId,
+    logId: call.recordingLogId,
+  });
   if (!info) return NextResponse.json({ error: "Recording isn't available yet" }, { status: 404 });
 
   const audioRes = await fetch(info.url, { headers: { Authorization: `Bearer ${info.token}` } });

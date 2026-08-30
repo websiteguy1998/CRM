@@ -396,6 +396,10 @@ model Call {
   startedAt      DateTime      @default(now())
   durationSec    Int           @default(0)
   recordingUrl   String?
+  // Zoom's per-leg call log "id" (distinct from externalId, which is the
+  // shared call_id both legs report) — the recordings sub-resource
+  // endpoint needs this specific id, not call_id.
+  recordingLogId String?
   transcript     String?
   aiSummary      String?
   nextAction     String?

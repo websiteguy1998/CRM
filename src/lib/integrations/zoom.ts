@@ -111,36 +111,46 @@ export async function getZoomUserInfo(organizationId: string, zoomUserId: string
 }
 
 /**
- * Looks up the downloadable recording for a finished call (by Zoom's
- * call_id) and returns the Zoom-hosted URL plus the bearer token needed to
- * fetch it — Zoom's recording URLs require that same Authorization header,
- * so callers must proxy the audio through our own server rather than
- * linking the browser straight to Zoom.
+ * Looks up the downloadable recording for a finished call and returns the
+ * Zoom-hosted URL plus the bearer token needed to fetch it — Zoom's
+ * recording URLs require that same Authorization header, so callers must
+ * proxy the audio through our own server rather than linking the browser
+ * straight to Zoom.
+ *
+ * Confirmed by live testing that /phone/call_history/{call_id}/recordings
+ * 404s with "No endpoint" — Zoom's call_id (the id shared by both legs of
+ * a call, which is what we dedupe Call rows on) isn't accepted by the
+ * recordings sub-resource. Takes both that call_id and, when we have it,
+ * the specific call log entry's own "id" (recordingLogId) and tries every
+ * id against every known path shape until one returns a recording.
  */
 export async function getCallRecordingDownloadInfo(
   organizationId: string,
-  zoomCallId: string
+  ids: { callId?: string | null; logId?: string | null }
 ): Promise<{ url: string; token: string; contentType?: string } | null> {
   const config = await getZoomConfig(organizationId);
   if (!config) return null;
   const token = await getAccessToken(config);
 
-  // Zoom sunset /phone/call_logs/{id}/recordings alongside the rest of the
-  // call_logs API (Nov 2025) in favor of call_history — try that first,
-  // and fall back to the old path in case an account is still on it.
-  for (const url of [
-    `https://api.zoom.us/v2/phone/call_history/${encodeURIComponent(zoomCallId)}/recordings`,
-    `https://api.zoom.us/v2/phone/call_logs/${encodeURIComponent(zoomCallId)}/recordings`,
-  ]) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) {
-      console.log(`[zoom] recording lookup failed for ${zoomCallId} via ${url}: ${res.status} ${await res.text()}`);
-      continue;
-    }
-    const data = await res.json();
-    const recording = data.recordings?.[0];
-    if (recording?.download_url) {
-      return { url: recording.download_url, token, contentType: recording.file_type };
+  const candidateIds = [ids.logId, ids.callId].filter((v): v is string => Boolean(v));
+  const pathsFor = (id: string) => [
+    `https://api.zoom.us/v2/phone/call_logs/${encodeURIComponent(id)}/recordings`,
+    `https://api.zoom.us/v2/phone/call_history/${encodeURIComponent(id)}/recordings`,
+    `https://api.zoom.us/v2/phone/recordings/${encodeURIComponent(id)}`,
+  ];
+
+  for (const id of candidateIds) {
+    for (const url of pathsFor(id)) {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        console.log(`[zoom] recording lookup failed for ${id} via ${url}: ${res.status} ${await res.text()}`);
+        continue;
+      }
+      const data = await res.json();
+      const recording = data.recordings?.[0] ?? (data.download_url ? data : null);
+      if (recording?.download_url) {
+        return { url: recording.download_url, token, contentType: recording.file_type };
+      }
     }
   }
   return null;

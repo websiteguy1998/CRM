@@ -128,6 +128,7 @@ export async function recordZoomCallLog(
   const durationSec = parseDurationSeconds(log.duration);
   const status = mapStatus(log.result, durationSec);
   const recorded = hasRecording(log);
+  const logId = typeof log.id === "string" ? log.id : undefined;
 
   const existing = await prisma.call.findFirst({ where: { organizationId, externalId: callId } });
   if (existing) {
@@ -142,6 +143,9 @@ export async function recordZoomCallLog(
     }
     if (recorded && !existing.recordingUrl) {
       data.recordingUrl = recordingUrlFor(existing.leadId, existing.id);
+    }
+    if (recorded && logId && !existing.recordingLogId) {
+      data.recordingLogId = logId;
     }
     if (Object.keys(data).length > 0) {
       await prisma.call.update({ where: { id: existing.id }, data });
@@ -185,7 +189,7 @@ export async function recordZoomCallLog(
   if (recorded) {
     await prisma.call.update({
       where: { id: call.id },
-      data: { recordingUrl: recordingUrlFor(lead?.id, call.id) },
+      data: { recordingUrl: recordingUrlFor(lead?.id, call.id), recordingLogId: logId },
     });
   }
 
