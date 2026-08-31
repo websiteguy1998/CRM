@@ -161,10 +161,12 @@ export default async function LeadsPage({
           <table className="w-full min-w-[1700px] whitespace-nowrap text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
+                {(admin || entryOnly) && <th className="px-4 py-2 font-medium"></th>}
                 <th className="px-4 py-2 font-medium">ID name</th>
                 <th className="px-4 py-2 font-medium">ID URL</th>
                 <th className="px-4 py-2 font-medium">ID Country</th>
                 <th className="px-4 py-2 font-medium">Client</th>
+                <th className="px-4 py-2 font-medium">Client country</th>
                 <th className="px-4 py-2 font-medium">Website</th>
                 <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium">Stage</th>
@@ -180,6 +182,18 @@ export default async function LeadsPage({
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                  {(admin || entryOnly) && (
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/leads/${lead.id}`}
+                        title="Edit lead"
+                        aria-label="Edit lead"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                      >
+                        ✏️
+                      </Link>
+                    </td>
+                  )}
                   <td className="px-4 py-2.5 text-slate-600">{lead.idName ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">
                     {lead.idUrl ? (
@@ -197,19 +211,16 @@ export default async function LeadsPage({
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{lead.country ?? "—"}</td>
                   <td className="px-4 py-2.5">
-                    {entryOnly ? (
-                      <span className="font-medium text-slate-800">{lead.contact.firstName}</span>
-                    ) : (
-                      <Link href={`/leads/${lead.id}`} className="font-medium text-slate-800 hover:underline">
-                        {lead.contact.firstName}
-                      </Link>
-                    )}
+                    <Link href={`/leads/${lead.id}`} className="font-medium text-slate-800 hover:underline">
+                      {lead.contact.firstName}
+                    </Link>
                     <div className="text-xs text-slate-400">
                       {lead.contact.phone && <span>{lead.contact.phone}</span>}
                       {lead.contact.phone && lead.contact.email && <span> · </span>}
                       {lead.contact.email && <span>{lead.contact.email}</span>}
                     </div>
                   </td>
+                  <td className="px-4 py-2.5 text-slate-600">{lead.clientCountry ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">
                     {lead.websiteUrl ? (
                       <a href={lead.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
@@ -263,7 +274,7 @@ export default async function LeadsPage({
               {leads.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10 + (entryOnly ? 0 : 2) + (admin ? 2 : 0)}
+                    colSpan={11 + (entryOnly ? 0 : 2) + (admin ? 2 : 0) + (admin || entryOnly ? 1 : 0)}
                     className="px-4 py-10 text-center text-slate-400"
                   >
                     No leads yet. Add one or import a CSV to get started.

@@ -27,6 +27,7 @@ export default function NewLeadDialog() {
           idName: form.get("idName") || undefined,
           idUrl: form.get("idUrl") || undefined,
           country: form.get("country") || undefined,
+          clientCountry: form.get("clientCountry") || undefined,
           websiteUrl: form.get("websiteUrl") || undefined,
           phone: form.get("phone") || undefined,
           email: form.get("email") || undefined,
@@ -76,9 +77,15 @@ export default function NewLeadDialog() {
               )}
             </div>
           )}
-          <div>
-            <label className="label">Client name</label>
-            <input name="clientName" required className="input" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Client name</label>
+              <input name="clientName" required className="input" />
+            </div>
+            <div>
+              <label className="label">Client country</label>
+              <input name="clientCountry" className="input" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -92,7 +99,7 @@ export default function NewLeadDialog() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Country</label>
+              <label className="label">ID Country</label>
               <input name="country" className="input" />
             </div>
             <div>

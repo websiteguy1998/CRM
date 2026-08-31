@@ -241,7 +241,10 @@ model Lead {
   idName        String?
   idUrl         String?
   websiteUrl    String?
+  // Country of the ID/profile (e.g. where the Fiverr account is based) —
+  // distinct from clientCountry below, which is the client's own country.
   country       String?
+  clientCountry String?
   deliveryDate  DateTime?
   price         Decimal?  @db.Decimal(12, 2)
   duration      String?

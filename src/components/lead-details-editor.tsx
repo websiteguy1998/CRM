@@ -11,6 +11,7 @@ type LeadDetails = {
   idName: string | null;
   idUrl: string | null;
   country: string | null;
+  clientCountry: string | null;
   websiteUrl: string | null;
   deliveryDate: string | null;
   price: string | null;
@@ -47,6 +48,7 @@ export default function LeadDetailsEditor({
           idName: form.get("idName") || undefined,
           idUrl: form.get("idUrl") || undefined,
           country: form.get("country") || undefined,
+          clientCountry: form.get("clientCountry") || undefined,
           websiteUrl: form.get("websiteUrl") || undefined,
           deliveryDate: form.get("deliveryDate") || undefined,
           price: form.get("price") || undefined,
@@ -86,6 +88,7 @@ export default function LeadDetailsEditor({
           {row("ID URL", details.idUrl)}
           {row("ID Country", details.country)}
           {row("Client name", details.clientName)}
+          {row("Client country", details.clientCountry)}
           {row("Phone", details.phone)}
           {row("Email", details.email)}
           {row("Website", details.websiteUrl)}
@@ -115,6 +118,7 @@ export default function LeadDetailsEditor({
       </div>
       <input name="country" defaultValue={details.country ?? ""} placeholder="ID Country" className="input" />
       <input name="clientName" required defaultValue={details.clientName} placeholder="Client name" className="input" />
+      <input name="clientCountry" defaultValue={details.clientCountry ?? ""} placeholder="Client country" className="input" />
       <div className="grid grid-cols-2 gap-2">
         <input name="phone" defaultValue={details.phone ?? ""} placeholder="Phone" className="input" />
         <input name="email" type="email" defaultValue={details.email ?? ""} placeholder="Email" className="input" />

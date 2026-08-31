@@ -38,6 +38,7 @@ const patchSchema = z.object({
   idName: z.string().optional(),
   idUrl: z.string().optional(),
   country: z.string().optional(),
+  clientCountry: z.string().optional(),
   websiteUrl: z.string().optional(),
   deliveryDate: z.string().optional(),
   price: z.coerce.number().optional(),

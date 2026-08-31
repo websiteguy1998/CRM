@@ -160,6 +160,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               idName: lead.idName,
               idUrl: lead.idUrl,
               country: lead.country,
+              clientCountry: lead.clientCountry,
               websiteUrl: lead.websiteUrl,
               deliveryDate: lead.deliveryDate ? lead.deliveryDate.toISOString() : null,
               price: lead.price != null ? String(lead.price) : null,
