@@ -86,3 +86,48 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ lead: updated });
 }
+
+/**
+ * Admin-only: permanently delete a lead. Calls aren't deleted — just
+ * unlinked (leadId set to null) — so call history/recordings survive on
+ * the Calls page even after the lead they were on is removed. The contact
+ * is dropped too if this was its only lead.
+ */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiSession();
+  if ("error" in auth) return auth.error;
+  if (!isAdmin(auth.session.role)) {
+    return NextResponse.json({ error: "Only a Super Admin can delete leads" }, { status: 403 });
+  }
+  const { id } = await params;
+  const { orgId } = auth.session;
+
+  const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId } });
+  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.call.updateMany({ where: { leadId: id }, data: { leadId: null } });
+
+    const conversations = await tx.conversation.findMany({ where: { leadId: id }, select: { id: true } });
+    const conversationIds = conversations.map((c) => c.id);
+    if (conversationIds.length > 0) {
+      await tx.message.deleteMany({ where: { conversationId: { in: conversationIds } } });
+      await tx.conversation.deleteMany({ where: { leadId: id } });
+    }
+
+    await tx.leadStageHistory.deleteMany({ where: { leadId: id } });
+    await tx.leadTag.deleteMany({ where: { leadId: id } });
+    await tx.task.deleteMany({ where: { leadId: id } });
+    await tx.deal.deleteMany({ where: { leadId: id } });
+    await tx.note.deleteMany({ where: { leadId: id } });
+    await tx.activity.deleteMany({ where: { leadId: id } });
+    await tx.lead.delete({ where: { id } });
+
+    const otherLeads = await tx.lead.count({ where: { contactId: lead.contactId } });
+    if (otherLeads === 0) {
+      await tx.contact.delete({ where: { id: lead.contactId } });
+    }
+  });
+
+  return NextResponse.json({ ok: true });
+}

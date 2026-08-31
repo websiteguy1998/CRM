@@ -6,6 +6,7 @@ import StageBadge from "@/components/stage-badge";
 import ScoreBadge from "@/components/score-badge";
 import NewLeadDialog from "@/components/new-lead-dialog";
 import OwnerSelector from "@/components/owner-selector";
+import DeleteLeadButton from "@/components/delete-lead-button";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
 import { formatCurrency, formatDateTime, localDateBoundary, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
@@ -173,6 +174,7 @@ export default async function LeadsPage({
                 {!entryOnly && <th className="px-4 py-2 font-medium">Seller</th>}
                 {admin && <th className="px-4 py-2 font-medium">Entered by</th>}
                 <th className="px-4 py-2 font-medium">Last activity</th>
+                {admin && <th className="px-4 py-2 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -251,12 +253,17 @@ export default async function LeadsPage({
                     <td className="px-4 py-2.5 text-slate-600">{lead.createdBy?.name ?? "—"}</td>
                   )}
                   <td className="px-4 py-2.5 text-slate-400">{relativeTime(lead.lastActivityAt)}</td>
+                  {admin && (
+                    <td className="px-4 py-2.5">
+                      <DeleteLeadButton leadId={lead.id} name={lead.contact.firstName} />
+                    </td>
+                  )}
                 </tr>
               ))}
               {leads.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10 + (entryOnly ? 0 : 2) + (admin ? 1 : 0)}
+                    colSpan={10 + (entryOnly ? 0 : 2) + (admin ? 2 : 0)}
                     className="px-4 py-10 text-center text-slate-400"
                   >
                     No leads yet. Add one or import a CSV to get started.
