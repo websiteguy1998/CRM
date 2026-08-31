@@ -154,6 +154,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             leadId={lead.id}
             editable={admin || entryOnly}
             details={{
+              clientName: lead.contact.firstName,
+              phone: lead.contact.phone,
+              email: lead.contact.email,
               idName: lead.idName,
               idUrl: lead.idUrl,
               country: lead.country,

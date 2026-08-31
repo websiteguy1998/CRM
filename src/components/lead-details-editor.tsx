@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS, type LeadCategoryValue } from "@/lib/categories";
 
 type LeadDetails = {
+  clientName: string;
+  phone: string | null;
+  email: string | null;
   idName: string | null;
   idUrl: string | null;
   country: string | null;
@@ -38,6 +41,9 @@ export default function LeadDetailsEditor({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          clientName: form.get("clientName") || undefined,
+          phone: form.get("phone") ?? "",
+          email: form.get("email") ?? "",
           idName: form.get("idName") || undefined,
           idUrl: form.get("idUrl") || undefined,
           country: form.get("country") || undefined,
@@ -78,7 +84,10 @@ export default function LeadDetailsEditor({
           {row("Category", details.category ? LEAD_CATEGORY_LABELS[details.category] : null)}
           {row("ID name", details.idName)}
           {row("ID URL", details.idUrl)}
-          {row("Country", details.country)}
+          {row("ID Country", details.country)}
+          {row("Client name", details.clientName)}
+          {row("Phone", details.phone)}
+          {row("Email", details.email)}
           {row("Website", details.websiteUrl)}
           {row("Delivery date", details.deliveryDate ? new Date(details.deliveryDate).toLocaleDateString() : null)}
           {row("Price", details.price)}
@@ -104,10 +113,13 @@ export default function LeadDetailsEditor({
         <input name="idName" defaultValue={details.idName ?? ""} placeholder="ID name" className="input" />
         <input name="idUrl" defaultValue={details.idUrl ?? ""} placeholder="ID URL" className="input" />
       </div>
+      <input name="country" defaultValue={details.country ?? ""} placeholder="ID Country" className="input" />
+      <input name="clientName" required defaultValue={details.clientName} placeholder="Client name" className="input" />
       <div className="grid grid-cols-2 gap-2">
-        <input name="country" defaultValue={details.country ?? ""} placeholder="Country" className="input" />
-        <input name="websiteUrl" defaultValue={details.websiteUrl ?? ""} placeholder="Website URL" className="input" />
+        <input name="phone" defaultValue={details.phone ?? ""} placeholder="Phone" className="input" />
+        <input name="email" type="email" defaultValue={details.email ?? ""} placeholder="Email" className="input" />
       </div>
+      <input name="websiteUrl" defaultValue={details.websiteUrl ?? ""} placeholder="Website URL" className="input" />
       <div className="grid grid-cols-3 gap-2">
         <input
           name="deliveryDate"

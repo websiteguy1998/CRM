@@ -163,8 +163,8 @@ export default async function LeadsPage({
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                 <th className="px-4 py-2 font-medium">ID name</th>
                 <th className="px-4 py-2 font-medium">ID URL</th>
+                <th className="px-4 py-2 font-medium">ID Country</th>
                 <th className="px-4 py-2 font-medium">Client</th>
-                <th className="px-4 py-2 font-medium">Country</th>
                 <th className="px-4 py-2 font-medium">Website</th>
                 <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium">Stage</th>
@@ -195,6 +195,7 @@ export default async function LeadsPage({
                       "—"
                     )}
                   </td>
+                  <td className="px-4 py-2.5 text-slate-600">{lead.country ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     {entryOnly ? (
                       <span className="font-medium text-slate-800">{lead.contact.firstName}</span>
@@ -209,7 +210,6 @@ export default async function LeadsPage({
                       {lead.contact.email && <span>{lead.contact.email}</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{lead.country ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">
                     {lead.websiteUrl ? (
                       <a href={lead.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">

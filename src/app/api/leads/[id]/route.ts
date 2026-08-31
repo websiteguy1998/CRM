@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
-import { normalizeIdentifyingField } from "@/lib/duplicate-lead";
+import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
@@ -32,6 +32,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 const patchSchema = z.object({
   ownerId: z.string().optional(),
   status: z.enum(["OPEN", "WON", "LOST", "NURTURE"]).optional(),
+  clientName: z.string().min(1).optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
   idName: z.string().optional(),
   idUrl: z.string().optional(),
   country: z.string().optional(),
@@ -62,13 +65,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Only a Super Admin can allocate leads" }, { status: 403 });
   }
 
-  const { deliveryDate, idUrl, websiteUrl, ...rest } = parsed.data;
+  const { deliveryDate, idUrl, websiteUrl, clientName, phone, email, ...rest } = parsed.data;
+  const normalizedPhone = phone !== undefined ? normalizeIdentifyingField(phone) : undefined;
+  const normalizedEmail = email !== undefined ? normalizeIdentifyingField(email) : undefined;
+  const normalizedWebsiteUrl = websiteUrl !== undefined ? normalizeIdentifyingField(websiteUrl) : undefined;
+
+  if (phone !== undefined || email !== undefined || websiteUrl !== undefined) {
+    const duplicate = await findDuplicateLead(orgId, {
+      phone: phone !== undefined ? normalizedPhone : undefined,
+      email: email !== undefined ? normalizedEmail : undefined,
+      websiteUrl: websiteUrl !== undefined ? normalizedWebsiteUrl : undefined,
+    });
+    if (duplicate && duplicate.id !== id) {
+      return NextResponse.json(
+        { error: "Another lead already uses this phone number, email, or website." },
+        { status: 409 }
+      );
+    }
+  }
+
+  if (clientName !== undefined || phone !== undefined || email !== undefined) {
+    await prisma.contact.update({
+      where: { id: lead.contactId },
+      data: {
+        ...(clientName !== undefined ? { firstName: clientName } : {}),
+        ...(phone !== undefined ? { phone: normalizedPhone ?? null } : {}),
+        ...(email !== undefined ? { email: normalizedEmail ?? null } : {}),
+      },
+    });
+  }
+
   const updated = await prisma.lead.update({
     where: { id },
     data: {
       ...rest,
       ...(idUrl !== undefined ? { idUrl: normalizeIdentifyingField(idUrl) ?? null } : {}),
-      ...(websiteUrl !== undefined ? { websiteUrl: normalizeIdentifyingField(websiteUrl) ?? null } : {}),
+      ...(websiteUrl !== undefined ? { websiteUrl: normalizedWebsiteUrl ?? null } : {}),
       ...(deliveryDate ? { deliveryDate: new Date(deliveryDate) } : {}),
     },
     include: { contact: true, owner: true },
