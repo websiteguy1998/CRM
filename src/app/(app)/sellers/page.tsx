@@ -12,11 +12,17 @@ type SellerStats = {
   wonValue: number;
 };
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export default async function SellersPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [sellers, ownedLeads] = await Promise.all([
+  const [sellers, ownedLeads, assignedToday] = await Promise.all([
     prisma.user.findMany({
       where: { organizationId: session.orgId, role: { in: ["AGENT", "MANAGER"] } },
       orderBy: { name: "asc" },
@@ -24,6 +30,19 @@ export default async function SellersPage() {
     prisma.lead.findMany({
       where: { organizationId: session.orgId, ownerId: { not: null } },
       select: { ownerId: true, status: true, price: true },
+    }),
+    // "Today" = leads allocated to their current owner today, same
+    // definition the dashboard uses for "Assigned to you today" — not
+    // just leads created today, since an older lead handed out today
+    // should count too.
+    prisma.activity.findMany({
+      where: {
+        organizationId: session.orgId,
+        type: "LEAD_ASSIGNED",
+        createdAt: { gte: startOfToday() },
+        lead: { ownerId: { not: null } },
+      },
+      select: { lead: { select: { ownerId: true } } },
     }),
   ]);
 
@@ -43,6 +62,13 @@ export default async function SellersPage() {
   }
   const empty: SellerStats = { total: 0, open: 0, won: 0, lost: 0, nurture: 0, wonValue: 0 };
 
+  const todayByOwner = new Map<string, number>();
+  for (const a of assignedToday) {
+    const key = a.lead?.ownerId;
+    if (!key) continue;
+    todayByOwner.set(key, (todayByOwner.get(key) ?? 0) + 1);
+  }
+
   return (
     <div>
       <PageHeader title="Sellers" description={`${sellers.length} sellers`} />
@@ -55,6 +81,7 @@ export default async function SellersPage() {
                 <th className="px-2.5 py-1.5 font-medium">Email</th>
                 <th className="px-2.5 py-1.5 font-medium">Role</th>
                 <th className="px-2.5 py-1.5 font-medium">Status</th>
+                <th className="px-2.5 py-1.5 font-medium">Today</th>
                 <th className="px-2.5 py-1.5 font-medium">Total leads</th>
                 <th className="px-2.5 py-1.5 font-medium">Open</th>
                 <th className="px-2.5 py-1.5 font-medium">Won</th>
@@ -66,6 +93,7 @@ export default async function SellersPage() {
             <tbody>
               {sellers.map((seller) => {
                 const s = statsByOwner.get(seller.id) ?? empty;
+                const today = todayByOwner.get(seller.id) ?? 0;
                 return (
                   <tr key={seller.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                     <td className="px-2.5 py-1.5 font-medium text-slate-800">{seller.name}</td>
@@ -80,6 +108,7 @@ export default async function SellersPage() {
                         {seller.active ? "Active" : "Inactive"}
                       </span>
                     </td>
+                    <td className="px-2.5 py-1.5 font-medium text-indigo-600">{today}</td>
                     <td className="px-2.5 py-1.5 font-medium text-slate-800">{s.total}</td>
                     <td className="px-2.5 py-1.5 text-slate-600">{s.open}</td>
                     <td className="px-2.5 py-1.5 text-emerald-700">{s.won}</td>
@@ -91,7 +120,7 @@ export default async function SellersPage() {
               })}
               {sellers.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-2.5 py-10 text-center text-slate-400">
+                  <td colSpan={11} className="px-2.5 py-10 text-center text-slate-400">
                     No sellers yet. Add one from Settings → Users & roles.
                   </td>
                 </tr>
