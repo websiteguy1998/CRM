@@ -272,6 +272,7 @@ export default async function LeadsPage({
                             .filter((o) => o.role === "AGENT" || o.role === "MANAGER")
                             .map((o) => ({ id: o.id, name: o.name }))}
                           currentOwnerId={lead.ownerId}
+                          compact
                         />
                       ) : (
                         <span className="text-slate-600">{lead.owner?.name ?? "Unassigned"}</span>

@@ -7,10 +7,12 @@ export default function OwnerSelector({
   leadId,
   owners,
   currentOwnerId,
+  compact,
 }: {
   leadId: string;
   owners: { id: string; name: string }[];
   currentOwnerId: string | null;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,11 @@ export default function OwnerSelector({
 
   return (
     <select
-      className="input min-w-[150px]"
+      className={
+        compact
+          ? "min-w-[120px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          : "input min-w-[150px]"
+      }
       defaultValue={currentOwnerId ?? ""}
       disabled={loading}
       onChange={(e) => onChange(e.target.value)}
