@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
             OR: [
               { idName: { contains: search, mode: "insensitive" } },
               { websiteUrl: { contains: search, mode: "insensitive" } },
+              { clientCountry: { contains: search, mode: "insensitive" } },
               {
                 contact: {
                   OR: [

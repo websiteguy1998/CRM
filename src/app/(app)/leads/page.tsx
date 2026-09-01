@@ -76,6 +76,7 @@ export default async function LeadsPage({
               OR: [
                 { idName: { contains: q, mode: "insensitive" } },
                 { websiteUrl: { contains: q, mode: "insensitive" } },
+                { clientCountry: { contains: q, mode: "insensitive" } },
                 {
                   contact: {
                     OR: [
@@ -155,7 +156,7 @@ export default async function LeadsPage({
           <input
             name="q"
             defaultValue={q}
-            placeholder="Search client, ID name, website…"
+            placeholder="Search client, country, ID name, website…"
             className="input max-w-xs"
           />
           <select name="stageId" defaultValue={stageId ?? ""} className="input max-w-[160px]">
