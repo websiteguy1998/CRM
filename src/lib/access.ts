@@ -59,6 +59,7 @@ export function leadWhereForSession(session: SessionPayload): Prisma.LeadWhereIn
 export const NAV_ACCESS: Record<string, SessionPayload["role"][]> = {
   "/": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],
   "/leads": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT", "LEAD_ENTRY"],
+  "/sellers": ["ADMIN"],
   "/pipeline": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],
   "/inbox": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],
   "/calls": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],

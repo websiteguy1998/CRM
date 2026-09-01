@@ -8,6 +8,7 @@ import { canAccess } from "@/lib/access";
 const NAV = [
   { href: "/", label: "Dashboard", icon: "🏠" },
   { href: "/leads", label: "Leads", icon: "🧑‍💼" },
+  { href: "/sellers", label: "Sellers", icon: "🧑‍💻" },
   { href: "/pipeline", label: "Pipeline", icon: "🧭" },
   { href: "/inbox", label: "Inbox", icon: "💬" },
   { href: "/calls", label: "Calls", icon: "📞" },
