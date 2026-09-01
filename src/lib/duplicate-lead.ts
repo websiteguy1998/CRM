@@ -17,6 +17,15 @@ export function normalizeIdentifyingField(value?: string | null): string | undef
   return trimmed;
 }
 
+/** A client can have more than one email — the field stores a comma/semicolon separated list, each checked individually. */
+export function isValidEmailList(value: string): boolean {
+  return value
+    .split(/[,;]+/)
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
+
 /**
  * Duplicate check on the fields that genuinely identify one client:
  * phone, email, and website. Everything else on a lead (client name, ID

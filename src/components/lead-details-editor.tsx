@@ -121,7 +121,14 @@ export default function LeadDetailsEditor({
       <input name="clientCountry" defaultValue={details.clientCountry ?? ""} placeholder="Client country" className="input" />
       <div className="grid grid-cols-2 gap-2">
         <input name="phone" defaultValue={details.phone ?? ""} placeholder="Phone" className="input" />
-        <input name="email" type="email" defaultValue={details.email ?? ""} placeholder="Email" className="input" />
+        <input
+          name="email"
+          type="email"
+          multiple
+          defaultValue={details.email ?? ""}
+          placeholder="Email(s), comma separated"
+          className="input"
+        />
       </div>
       <input name="websiteUrl" defaultValue={details.websiteUrl ?? ""} placeholder="Website URL" className="input" />
       <div className="grid grid-cols-3 gap-2">

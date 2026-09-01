@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
-import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
+import { findDuplicateLead, normalizeIdentifyingField, isValidEmailList } from "@/lib/duplicate-lead";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
@@ -34,7 +34,10 @@ const patchSchema = z.object({
   status: z.enum(["OPEN", "WON", "LOST", "NURTURE"]).optional(),
   clientName: z.string().min(1).optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z
+    .string()
+    .optional()
+    .refine((v) => !v || isValidEmailList(v), { message: "Enter valid email address(es), separated by commas" }),
   idName: z.string().optional(),
   idUrl: z.string().optional(),
   country: z.string().optional(),

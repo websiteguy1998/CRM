@@ -114,7 +114,7 @@ export default function NewLeadDialog() {
             </div>
             <div>
               <label className="label">Email</label>
-              <input name="email" type="email" className="input" />
+              <input name="email" type="email" multiple placeholder="Email(s), comma separated" className="input" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

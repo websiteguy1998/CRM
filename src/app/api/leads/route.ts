@@ -5,7 +5,7 @@ import { requireApiSession } from "@/lib/api-auth";
 import { getFirstStage } from "@/lib/pipeline";
 import { logActivity } from "@/lib/timeline";
 import { leadWhereForSession, isAdmin } from "@/lib/access";
-import { findDuplicateLead, normalizeIdentifyingField } from "@/lib/duplicate-lead";
+import { findDuplicateLead, normalizeIdentifyingField, isValidEmailList } from "@/lib/duplicate-lead";
 
 export async function GET(req: NextRequest) {
   const auth = await requireApiSession();
@@ -65,7 +65,10 @@ const createLeadSchema = z.object({
   clientCountry: z.string().optional(),
   websiteUrl: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z
+    .string()
+    .optional()
+    .refine((v) => !v || isValidEmailList(v), { message: "Enter valid email address(es), separated by commas" }),
   deliveryDate: z.string().optional(),
   price: z.coerce.number().optional(),
   duration: z.string().optional(),
