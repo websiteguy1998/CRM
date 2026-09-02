@@ -205,25 +205,29 @@ export default async function LeadsPage({
         </form>
 
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[1500px] whitespace-nowrap text-xs">
+          {/* table-fixed + explicit column widths so one cell with unbreakable
+              long content (a huge Fiverr delivery-asset URL, say) can never
+              blow the whole table's column widths out again — it just
+              truncates with an ellipsis inside its own column instead. */}
+          <table className="w-full min-w-[1500px] table-fixed text-xs">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] text-slate-500">
-                {(admin || entryOnly) && <th className="px-2.5 py-1.5 font-medium"></th>}
-                <th className="px-2.5 py-1.5 font-medium">ID name</th>
-                <th className="px-2.5 py-1.5 font-medium">Client</th>
-                <th className="px-2.5 py-1.5 font-medium">Website</th>
-                <th className="px-2.5 py-1.5 font-medium">Price</th>
-                {!entryOnly && <th className="px-2.5 py-1.5 font-medium">Seller</th>}
-                <th className="px-2.5 py-1.5 font-medium">Delivery</th>
-                <th className="px-2.5 py-1.5 font-medium">ID URL</th>
-                <th className="px-2.5 py-1.5 font-medium">ID Country</th>
-                <th className="px-2.5 py-1.5 font-medium">Client country</th>
-                <th className="px-2.5 py-1.5 font-medium">Category</th>
-                <th className="px-2.5 py-1.5 font-medium">Stage</th>
-                {!entryOnly && <th className="px-2.5 py-1.5 font-medium">Status</th>}
-                {admin && <th className="px-2.5 py-1.5 font-medium">Entered by</th>}
-                <th className="px-2.5 py-1.5 font-medium">Last activity</th>
-                {admin && <th className="px-2.5 py-1.5 font-medium"></th>}
+                {(admin || entryOnly) && <th className="w-8 px-2.5 py-1.5 font-medium"></th>}
+                <th className="w-28 px-2.5 py-1.5 font-medium">ID name</th>
+                <th className="w-48 px-2.5 py-1.5 font-medium">Client</th>
+                <th className="w-40 px-2.5 py-1.5 font-medium">Website</th>
+                <th className="w-20 px-2.5 py-1.5 font-medium">Price</th>
+                {!entryOnly && <th className="w-32 px-2.5 py-1.5 font-medium">Seller</th>}
+                <th className="w-24 px-2.5 py-1.5 font-medium">Delivery</th>
+                <th className="w-40 px-2.5 py-1.5 font-medium">ID URL</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">ID Country</th>
+                <th className="w-20 px-2.5 py-1.5 font-medium">Client country</th>
+                <th className="w-28 px-2.5 py-1.5 font-medium">Category</th>
+                <th className="w-24 px-2.5 py-1.5 font-medium">Stage</th>
+                {!entryOnly && <th className="w-32 px-2.5 py-1.5 font-medium">Status</th>}
+                {admin && <th className="w-24 px-2.5 py-1.5 font-medium">Entered by</th>}
+                <th className="w-20 px-2.5 py-1.5 font-medium">Last activity</th>
+                {admin && <th className="w-12 px-2.5 py-1.5 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -241,18 +245,23 @@ export default async function LeadsPage({
                       </Link>
                     </td>
                   )}
-                  <td className="px-2.5 py-1 text-slate-600">{lead.idName ?? "—"}</td>
+                  <td className="truncate px-2.5 py-1 text-slate-600" title={lead.idName ?? undefined}>
+                    {lead.idName ?? "—"}
+                  </td>
                   <td className="px-2.5 py-1">
-                    <Link href={`/leads/${lead.id}`} className="font-medium text-slate-800 hover:underline">
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      className="block truncate font-medium text-slate-800 hover:underline"
+                    >
                       {lead.contact.firstName}
                     </Link>
-                    <div className="text-[11px] text-slate-400">
+                    <div className="truncate text-[11px] text-slate-400">
                       {lead.contact.phone && <span>{lead.contact.phone}</span>}
                       {lead.contact.phone && lead.contact.email && <span> · </span>}
                       {lead.contact.email && <span>{lead.contact.email}</span>}
                     </div>
                   </td>
-                  <td className="max-w-[220px] px-2.5 py-1 text-slate-600">
+                  <td className="px-2.5 py-1 text-slate-600">
                     {lead.websiteUrl ? (
                       <a
                         href={lead.websiteUrl}
@@ -267,7 +276,7 @@ export default async function LeadsPage({
                       "—"
                     )}
                   </td>
-                  <td className="px-2.5 py-1 text-slate-600">
+                  <td className="truncate px-2.5 py-1 text-slate-600">
                     {lead.price != null ? formatCurrency(Number(lead.price)) : "—"}
                   </td>
                   {!entryOnly && (
@@ -286,10 +295,10 @@ export default async function LeadsPage({
                       )}
                     </td>
                   )}
-                  <td className="px-2.5 py-1 text-slate-600">
+                  <td className="truncate px-2.5 py-1 text-slate-600">
                     {lead.deliveryDate ? formatDateTime(lead.deliveryDate) : "—"}
                   </td>
-                  <td className="max-w-[180px] px-2.5 py-1 text-slate-600">
+                  <td className="px-2.5 py-1 text-slate-600">
                     {lead.idUrl ? (
                       <a
                         href={lead.idUrl}
@@ -304,21 +313,27 @@ export default async function LeadsPage({
                       "—"
                     )}
                   </td>
-                  <td className="px-2.5 py-1 text-slate-600">{lead.country ?? "—"}</td>
-                  <td className="px-2.5 py-1 text-slate-600">{lead.clientCountry ?? "—"}</td>
-                  <td className="px-2.5 py-1 text-slate-600">
+                  <td className="truncate px-2.5 py-1 text-slate-600" title={lead.country ?? undefined}>
+                    {lead.country ?? "—"}
+                  </td>
+                  <td className="truncate px-2.5 py-1 text-slate-600" title={lead.clientCountry ?? undefined}>
+                    {lead.clientCountry ?? "—"}
+                  </td>
+                  <td className="truncate px-2.5 py-1 text-slate-600">
                     {lead.category ? LEAD_CATEGORY_LABELS[lead.category] : "—"}
                   </td>
                   <td className="px-2.5 py-1">
                     <StageBadge name={lead.stage.name} isWon={lead.stage.isWon} isLost={lead.stage.isLost} />
                   </td>
                   {!entryOnly && (
-                    <td className="px-2.5 py-1 text-slate-600">{lead.statusNote ?? "—"}</td>
+                    <td className="truncate px-2.5 py-1 text-slate-600" title={lead.statusNote ?? undefined}>
+                      {lead.statusNote ?? "—"}
+                    </td>
                   )}
                   {admin && (
-                    <td className="px-2.5 py-1 text-slate-600">{lead.createdBy?.name ?? "—"}</td>
+                    <td className="truncate px-2.5 py-1 text-slate-600">{lead.createdBy?.name ?? "—"}</td>
                   )}
-                  <td className="px-2.5 py-1 text-slate-400">{relativeTime(lead.lastActivityAt)}</td>
+                  <td className="truncate px-2.5 py-1 text-slate-400">{relativeTime(lead.lastActivityAt)}</td>
                   {admin && (
                     <td className="px-2.5 py-1">
                       <DeleteLeadButton leadId={lead.id} name={lead.contact.firstName} />
