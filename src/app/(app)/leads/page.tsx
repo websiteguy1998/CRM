@@ -252,9 +252,15 @@ export default async function LeadsPage({
                       {lead.contact.email && <span>{lead.contact.email}</span>}
                     </div>
                   </td>
-                  <td className="px-2.5 py-1 text-slate-600">
+                  <td className="max-w-[220px] px-2.5 py-1 text-slate-600">
                     {lead.websiteUrl ? (
-                      <a href={lead.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                      <a
+                        href={lead.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={lead.websiteUrl}
+                        className="block truncate text-indigo-600 hover:underline"
+                      >
                         {lead.websiteUrl.replace(/^https?:\/\//, "")}
                       </a>
                     ) : (
@@ -283,13 +289,14 @@ export default async function LeadsPage({
                   <td className="px-2.5 py-1 text-slate-600">
                     {lead.deliveryDate ? formatDateTime(lead.deliveryDate) : "—"}
                   </td>
-                  <td className="px-2.5 py-1 text-slate-600">
+                  <td className="max-w-[180px] px-2.5 py-1 text-slate-600">
                     {lead.idUrl ? (
                       <a
                         href={lead.idUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-indigo-600 hover:underline"
+                        title={lead.idUrl}
+                        className="block truncate text-indigo-600 hover:underline"
                       >
                         {lead.idUrl.replace(/^https?:\/\//, "")}
                       </a>
