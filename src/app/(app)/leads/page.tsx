@@ -76,9 +76,9 @@ export default async function LeadsPage({
         ...(admin && createdById ? { createdById } : {}),
         ...(admin && ownerId
           ? { ownerId }
-          : assigned === "yes"
+          : admin && assigned === "yes"
             ? { ownerId: { not: null } }
-            : assigned === "no"
+            : admin && assigned === "no"
               ? { ownerId: null }
               : {}),
         ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
@@ -158,7 +158,7 @@ export default async function LeadsPage({
         }
       />
       <div className="p-6">
-        {!entryOnly && (
+        {admin && (
           <div className="mb-3 flex gap-1.5">
             {(
               [
