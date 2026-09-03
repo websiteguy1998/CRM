@@ -23,7 +23,23 @@ type LeadsSearchParams = {
   to?: string;
   tzOffset?: string;
   assigned?: string;
+  idCountry?: string;
+  clientCountry?: string;
 };
+
+/** Country values get typed inconsistently ("Pak" / "PAK" / "pak") — group
+ * them case-insensitively for the filter dropdown so the same country
+ * doesn't show up as three separate options. */
+function dedupeCaseInsensitive(values: (string | null)[]): string[] {
+  const seen = new Map<string, string>();
+  for (const raw of values) {
+    const v = raw?.trim();
+    if (!v) continue;
+    const key = v.toLowerCase();
+    if (!seen.has(key)) seen.set(key, v);
+  }
+  return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+}
 
 function assignedTabHref(params: LeadsSearchParams, value: "" | "yes" | "no") {
   const qs = new URLSearchParams();
@@ -43,16 +59,18 @@ export default async function LeadsPage({
   const session = await getSession();
   if (!session) return null;
   const params = await searchParams;
-  const { q, stageId, ownerId, createdById, category, from, to, tzOffset, assigned } = params;
+  const { q, stageId, ownerId, createdById, category, from, to, tzOffset, assigned, idCountry, clientCountry } =
+    params;
   const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
+  const visWhere = leadWhereForSession(session);
 
-  const [leads, stages, owners, enterers] = await Promise.all([
+  const [leads, stages, owners, enterers, idCountryRows, clientCountryRows] = await Promise.all([
     prisma.lead.findMany({
       where: {
         organizationId: session.orgId,
-        ...leadWhereForSession(session),
+        ...visWhere,
         ...(stageId ? { stageId } : {}),
         ...(category ? { category: category as LeadCategory } : {}),
         ...(admin && createdById ? { createdById } : {}),
@@ -63,6 +81,8 @@ export default async function LeadsPage({
             : assigned === "no"
               ? { ownerId: null }
               : {}),
+        ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
+        ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
         ...(admin && (from || to)
           ? {
               createdAt: {
@@ -104,7 +124,20 @@ export default async function LeadsPage({
           where: { organizationId: session.orgId, active: true, role: { in: ["ADMIN", "LEAD_ENTRY"] } },
         })
       : Promise.resolve([]),
+    prisma.lead.findMany({
+      where: { organizationId: session.orgId, ...visWhere, country: { not: null } },
+      select: { country: true },
+      distinct: ["country"],
+    }),
+    prisma.lead.findMany({
+      where: { organizationId: session.orgId, ...visWhere, clientCountry: { not: null } },
+      select: { clientCountry: true },
+      distinct: ["clientCountry"],
+    }),
   ]);
+
+  const idCountryOptions = dedupeCaseInsensitive(idCountryRows.map((r) => r.country));
+  const clientCountryOptions = dedupeCaseInsensitive(clientCountryRows.map((r) => r.clientCountry));
 
   return (
     <div>
@@ -172,6 +205,22 @@ export default async function LeadsPage({
             {LEAD_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {LEAD_CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
+          <select name="idCountry" defaultValue={idCountry ?? ""} className="input max-w-[150px]">
+            <option value="">All ID countries</option>
+            {idCountryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <select name="clientCountry" defaultValue={clientCountry ?? ""} className="input max-w-[150px]">
+            <option value="">All client countries</option>
+            {clientCountryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>
@@ -268,7 +317,7 @@ export default async function LeadsPage({
                         target="_blank"
                         rel="noreferrer"
                         title={lead.websiteUrl}
-                        className="block truncate text-indigo-600 hover:underline"
+                        className="block break-all text-indigo-600 hover:underline"
                       >
                         {lead.websiteUrl.replace(/^https?:\/\//, "")}
                       </a>
@@ -305,7 +354,7 @@ export default async function LeadsPage({
                         target="_blank"
                         rel="noreferrer"
                         title={lead.idUrl}
-                        className="block truncate text-indigo-600 hover:underline"
+                        className="block break-all text-indigo-600 hover:underline"
                       >
                         {lead.idUrl.replace(/^https?:\/\//, "")}
                       </a>

@@ -141,29 +141,46 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId } });
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.$transaction(async (tx) => {
-    await tx.call.updateMany({ where: { leadId: id }, data: { leadId: null } });
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.call.updateMany({ where: { leadId: id }, data: { leadId: null } });
 
-    const conversations = await tx.conversation.findMany({ where: { leadId: id }, select: { id: true } });
-    const conversationIds = conversations.map((c) => c.id);
-    if (conversationIds.length > 0) {
-      await tx.message.deleteMany({ where: { conversationId: { in: conversationIds } } });
-      await tx.conversation.deleteMany({ where: { leadId: id } });
-    }
+        const conversations = await tx.conversation.findMany({ where: { leadId: id }, select: { id: true } });
+        const conversationIds = conversations.map((c) => c.id);
+        if (conversationIds.length > 0) {
+          // Attachments reference messages by id — they have to go first, or
+          // deleting the messages below trips a foreign-key constraint and
+          // silently rolls back the whole delete.
+          await tx.attachment.deleteMany({
+            where: { message: { conversationId: { in: conversationIds } } },
+          });
+          await tx.message.deleteMany({ where: { conversationId: { in: conversationIds } } });
+          await tx.conversation.deleteMany({ where: { leadId: id } });
+        }
 
-    await tx.leadStageHistory.deleteMany({ where: { leadId: id } });
-    await tx.leadTag.deleteMany({ where: { leadId: id } });
-    await tx.task.deleteMany({ where: { leadId: id } });
-    await tx.deal.deleteMany({ where: { leadId: id } });
-    await tx.note.deleteMany({ where: { leadId: id } });
-    await tx.activity.deleteMany({ where: { leadId: id } });
-    await tx.lead.delete({ where: { id } });
+        await tx.leadStageHistory.deleteMany({ where: { leadId: id } });
+        await tx.leadTag.deleteMany({ where: { leadId: id } });
+        await tx.task.deleteMany({ where: { leadId: id } });
+        await tx.deal.deleteMany({ where: { leadId: id } });
+        await tx.note.deleteMany({ where: { leadId: id } });
+        await tx.activity.deleteMany({ where: { leadId: id } });
+        await tx.lead.delete({ where: { id } });
 
-    const otherLeads = await tx.lead.count({ where: { contactId: lead.contactId } });
-    if (otherLeads === 0) {
-      await tx.contact.delete({ where: { id: lead.contactId } });
-    }
-  });
+        const otherLeads = await tx.lead.count({ where: { contactId: lead.contactId } });
+        if (otherLeads === 0) {
+          await tx.contact.delete({ where: { id: lead.contactId } });
+        }
+      },
+      { timeout: 15000 }
+    );
+  } catch (err) {
+    console.error(`[leads] delete failed for lead ${id}:`, err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not delete lead" },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

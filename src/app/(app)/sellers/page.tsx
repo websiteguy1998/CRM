@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
@@ -31,10 +32,11 @@ export default async function SellersPage() {
       where: { organizationId: session.orgId, ownerId: { not: null } },
       select: { ownerId: true, status: true, price: true },
     }),
-    // "Today" = leads allocated to their current owner today, same
-    // definition the dashboard uses for "Assigned to you today" — not
-    // just leads created today, since an older lead handed out today
-    // should count too.
+    // "Today" = distinct leads allocated to their current owner today, same
+    // definition the dashboard uses for "Assigned to you today" — not just
+    // leads created today, since an older lead handed out today should
+    // count too. Grouped by distinct lead id, not raw activity count, so a
+    // lead reassigned back and forth the same day isn't counted twice.
     prisma.activity.findMany({
       where: {
         organizationId: session.orgId,
@@ -42,7 +44,7 @@ export default async function SellersPage() {
         createdAt: { gte: startOfToday() },
         lead: { ownerId: { not: null } },
       },
-      select: { lead: { select: { ownerId: true } } },
+      select: { leadId: true, lead: { select: { ownerId: true } } },
     }),
   ]);
 
@@ -62,11 +64,13 @@ export default async function SellersPage() {
   }
   const empty: SellerStats = { total: 0, open: 0, won: 0, lost: 0, nurture: 0, wonValue: 0 };
 
-  const todayByOwner = new Map<string, number>();
+  const todayLeadsByOwner = new Map<string, Set<string>>();
   for (const a of assignedToday) {
-    const key = a.lead?.ownerId;
-    if (!key) continue;
-    todayByOwner.set(key, (todayByOwner.get(key) ?? 0) + 1);
+    const owner = a.lead?.ownerId;
+    if (!owner) continue;
+    const set = todayLeadsByOwner.get(owner) ?? new Set<string>();
+    set.add(a.leadId);
+    todayLeadsByOwner.set(owner, set);
   }
 
   return (
@@ -74,31 +78,35 @@ export default async function SellersPage() {
       <PageHeader title="Sellers" description={`${sellers.length} sellers`} />
       <div className="p-6">
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[1000px] whitespace-nowrap text-xs">
+          <table className="w-full min-w-[1000px] table-fixed text-xs">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-[11px] text-slate-500">
-                <th className="px-2.5 py-1.5 font-medium">Seller</th>
-                <th className="px-2.5 py-1.5 font-medium">Email</th>
-                <th className="px-2.5 py-1.5 font-medium">Role</th>
-                <th className="px-2.5 py-1.5 font-medium">Status</th>
-                <th className="px-2.5 py-1.5 font-medium">Today</th>
-                <th className="px-2.5 py-1.5 font-medium">Total leads</th>
-                <th className="px-2.5 py-1.5 font-medium">Open</th>
-                <th className="px-2.5 py-1.5 font-medium">Won</th>
-                <th className="px-2.5 py-1.5 font-medium">Lost</th>
-                <th className="px-2.5 py-1.5 font-medium">Nurture</th>
-                <th className="px-2.5 py-1.5 font-medium">Won value</th>
+                <th className="w-40 px-2.5 py-1.5 font-medium">Seller</th>
+                <th className="w-48 px-2.5 py-1.5 font-medium">Email</th>
+                <th className="w-20 px-2.5 py-1.5 font-medium">Role</th>
+                <th className="w-20 px-2.5 py-1.5 font-medium">Status</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">Today</th>
+                <th className="w-24 px-2.5 py-1.5 font-medium">Total leads</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">Open</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">Won</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">Lost</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium">Nurture</th>
+                <th className="w-24 px-2.5 py-1.5 font-medium">Won value</th>
               </tr>
             </thead>
             <tbody>
               {sellers.map((seller) => {
                 const s = statsByOwner.get(seller.id) ?? empty;
-                const today = todayByOwner.get(seller.id) ?? 0;
+                const today = todayLeadsByOwner.get(seller.id)?.size ?? 0;
                 return (
                   <tr key={seller.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                    <td className="px-2.5 py-1.5 font-medium text-slate-800">{seller.name}</td>
-                    <td className="px-2.5 py-1.5 text-slate-600">{seller.email}</td>
-                    <td className="px-2.5 py-1.5 text-slate-600">{seller.role}</td>
+                    <td className="truncate px-2.5 py-1.5 font-medium text-slate-800">
+                      <Link href={`/sellers/${seller.id}`} className="hover:underline">
+                        {seller.name}
+                      </Link>
+                    </td>
+                    <td className="truncate px-2.5 py-1.5 text-slate-600">{seller.email}</td>
+                    <td className="truncate px-2.5 py-1.5 text-slate-600">{seller.role}</td>
                     <td className="px-2.5 py-1.5">
                       <span
                         className={`badge ${
@@ -114,7 +122,7 @@ export default async function SellersPage() {
                     <td className="px-2.5 py-1.5 text-emerald-700">{s.won}</td>
                     <td className="px-2.5 py-1.5 text-rose-600">{s.lost}</td>
                     <td className="px-2.5 py-1.5 text-slate-600">{s.nurture}</td>
-                    <td className="px-2.5 py-1.5 text-slate-600">{formatCurrency(s.wonValue)}</td>
+                    <td className="truncate px-2.5 py-1.5 text-slate-600">{formatCurrency(s.wonValue)}</td>
                   </tr>
                 );
               })}
