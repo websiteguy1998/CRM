@@ -266,7 +266,7 @@ export default async function LeadsPage({
                 <th className="w-48 px-2.5 py-1.5 font-medium">Client</th>
                 <th className="w-40 px-2.5 py-1.5 font-medium">Website</th>
                 <th className="w-20 px-2.5 py-1.5 font-medium">Price</th>
-                {!entryOnly && <th className="w-32 px-2.5 py-1.5 font-medium">Seller</th>}
+                {!entryOnly && <th className="w-36 px-2.5 py-1.5 font-medium">Seller</th>}
                 <th className="w-24 px-2.5 py-1.5 font-medium">Delivery</th>
                 <th className="w-40 px-2.5 py-1.5 font-medium">ID URL</th>
                 <th className="w-16 px-2.5 py-1.5 font-medium">ID Country</th>
@@ -329,7 +329,7 @@ export default async function LeadsPage({
                     {lead.price != null ? formatCurrency(Number(lead.price)) : "—"}
                   </td>
                   {!entryOnly && (
-                    <td className="px-2.5 py-1">
+                    <td className="overflow-hidden px-2.5 py-1">
                       {admin ? (
                         <OwnerSelector
                           leadId={lead.id}

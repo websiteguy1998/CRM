@@ -35,7 +35,7 @@ export default function OwnerSelector({
     <select
       className={
         compact
-          ? "min-w-[120px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          ? "w-full max-w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           : "input min-w-[150px]"
       }
       defaultValue={currentOwnerId ?? ""}
