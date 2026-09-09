@@ -26,8 +26,11 @@ export default async function ReportsPage() {
         calls: { select: { id: true, status: true } },
       },
     }),
-    prisma.deal.findMany({ where: { organizationId: orgId, status: "WON" } }),
-    prisma.deal.count({ where: { organizationId: orgId, status: "LOST" } }),
+    // Revenue tracks Lead.price (what a seller enters as the closed
+    // amount), not the separate Deal model — nothing in the app ever
+    // creates a Deal record, so Deal-based totals were always zero.
+    prisma.lead.findMany({ where: { organizationId: orgId, status: "WON" }, select: { price: true } }),
+    prisma.lead.count({ where: { organizationId: orgId, status: "LOST" } }),
     prisma.message.groupBy({
       by: ["direction"],
       where: { conversation: { organizationId: orgId } },
@@ -43,7 +46,7 @@ export default async function ReportsPage() {
   const sourceNames = await prisma.leadSource.findMany({ where: { organizationId: orgId } });
   const stageNames = await prisma.pipelineStage.findMany({ where: { pipeline: { organizationId: orgId } } });
 
-  const totalRevenue = dealsWon.reduce((sum, d) => sum + Number(d.value), 0);
+  const totalRevenue = dealsWon.reduce((sum, l) => sum + (l.price != null ? Number(l.price) : 0), 0);
   const totalLeads = await prisma.lead.count({ where: { organizationId: orgId } });
   const conversionRate = totalLeads ? ((dealsWon.length / totalLeads) * 100).toFixed(1) : "0.0";
 
@@ -53,8 +56,8 @@ export default async function ReportsPage() {
 
   const agentRows = await Promise.all(
     agents.map(async (a) => {
-      const won = await prisma.deal.findMany({ where: { lead: { ownerId: a.id }, status: "WON" } });
-      const revenue = won.reduce((s, d) => s + Number(d.value), 0);
+      const won = await prisma.lead.findMany({ where: { ownerId: a.id, status: "WON" }, select: { price: true } });
+      const revenue = won.reduce((s, l) => s + (l.price != null ? Number(l.price) : 0), 0);
       const rate = a.ownedLeads.length ? ((won.length / a.ownedLeads.length) * 100).toFixed(1) : "0.0";
       return { name: a.name, leads: a.ownedLeads.length, calls: a.calls.length, deals: won.length, revenue, rate };
     })

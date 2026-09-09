@@ -70,12 +70,15 @@ export default async function DashboardPage() {
     prisma.task.count({
       where: { organizationId: orgId, completedAt: null, dueAt: { lte: new Date() }, lead: leadWhere },
     }),
-    prisma.deal.count({
-      where: { organizationId: orgId, status: "WON", closedAt: { gte: today }, lead: leadWhere },
+    // Revenue tracks Lead.price (what a seller enters as the closed
+    // amount), not the separate Deal model — nothing in the app ever
+    // creates a Deal record, so Deal-based totals were always zero.
+    prisma.leadStageHistory.count({
+      where: { changedAt: { gte: today }, toStage: { isWon: true }, lead: { organizationId: orgId, ...leadWhere } },
     }),
-    prisma.deal.aggregate({
-      where: { organizationId: orgId, status: "WON", lead: leadWhere },
-      _sum: { value: true },
+    prisma.lead.aggregate({
+      where: { organizationId: orgId, status: "WON", ...leadWhere },
+      _sum: { price: true },
     }),
     prisma.lead.count({ where: { organizationId: orgId, status: "OPEN", ...leadWhere } }),
     prisma.task.findMany({
@@ -113,16 +116,17 @@ export default async function DashboardPage() {
 
   const leaderboard = await Promise.all(
     agents.map(async (agent) => {
-      const deals = await prisma.deal.findMany({
-        where: { lead: { ownerId: agent.id }, status: "WON" },
+      const wonLeads = await prisma.lead.findMany({
+        where: { ownerId: agent.id, status: "WON" },
+        select: { price: true },
       });
-      const revenue = deals.reduce((sum, d) => sum + Number(d.value), 0);
+      const revenue = wonLeads.reduce((sum, l) => sum + (l.price != null ? Number(l.price) : 0), 0);
       return {
         id: agent.id,
         name: agent.name,
         leads: agent._count.ownedLeads,
         calls: agent.calls.length,
-        deals: deals.length,
+        deals: wonLeads.length,
         revenue,
       };
     })
@@ -137,7 +141,7 @@ export default async function DashboardPage() {
     { label: "Follow-ups due", value: followUpsDue },
     { label: "Deals won today", value: dealsWon },
     { label: "Open pipeline", value: totalOpenLeads },
-    { label: "Total revenue", value: formatCurrency(Number(revenueAgg._sum.value ?? 0)) },
+    { label: "Total revenue", value: formatCurrency(Number(revenueAgg._sum.price ?? 0)) },
   ];
 
   return (

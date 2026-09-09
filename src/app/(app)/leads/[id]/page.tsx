@@ -8,6 +8,7 @@ import StageSelector from "@/components/stage-selector";
 import OwnerSelector from "@/components/owner-selector";
 import LeadActions from "@/components/lead-actions";
 import LeadDetailsEditor from "@/components/lead-details-editor";
+import SellerDealEditor from "@/components/seller-deal-editor";
 import PendingCallSync from "@/components/pending-call-sync";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
@@ -169,6 +170,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               category: lead.category,
             }}
           />
+
+          {!admin && !entryOnly && (
+            <SellerDealEditor
+              leadId={lead.id}
+              initialStatusNote={lead.statusNote}
+              initialPrice={lead.price != null ? String(lead.price) : null}
+            />
+          )}
 
           <div className="card p-4">
             <h2 className="mb-3 text-sm font-semibold text-slate-900">Open follow-ups</h2>
