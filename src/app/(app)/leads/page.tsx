@@ -25,6 +25,7 @@ type LeadsSearchParams = {
   assigned?: string;
   idCountry?: string;
   clientCountry?: string;
+  sort?: string;
 };
 
 /** Country values get typed inconsistently ("Pak" / "PAK" / "pak") — group
@@ -59,8 +60,20 @@ export default async function LeadsPage({
   const session = await getSession();
   if (!session) return null;
   const params = await searchParams;
-  const { q, stageId, ownerId, createdById, category, from, to, tzOffset, assigned, idCountry, clientCountry } =
-    params;
+  const {
+    q,
+    stageId,
+    ownerId,
+    createdById,
+    category,
+    from,
+    to,
+    tzOffset,
+    assigned,
+    idCountry,
+    clientCountry,
+    sort,
+  } = params;
   const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
@@ -111,7 +124,12 @@ export default async function LeadsPage({
           : {}),
       },
       include: { contact: true, stage: true, owner: true, createdBy: true },
-      orderBy: { lastActivityAt: "desc" },
+      orderBy:
+        sort === "deliveryDesc"
+          ? { deliveryDate: { sort: "desc", nulls: "last" } }
+          : sort === "deliveryAsc"
+            ? { deliveryDate: { sort: "asc", nulls: "last" } }
+            : { lastActivityAt: "desc" },
       take: 200,
     }),
     prisma.pipelineStage.findMany({
@@ -223,6 +241,11 @@ export default async function LeadsPage({
                 {c}
               </option>
             ))}
+          </select>
+          <select name="sort" defaultValue={sort ?? ""} className="input max-w-[190px]">
+            <option value="">Sort: Last activity</option>
+            <option value="deliveryDesc">Delivery date: newest first</option>
+            <option value="deliveryAsc">Delivery date: oldest first</option>
           </select>
           {admin && (
             <>
