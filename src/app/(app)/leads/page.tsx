@@ -3,9 +3,11 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import StageBadge from "@/components/stage-badge";
+import StageSelector from "@/components/stage-selector";
 import ScoreBadge from "@/components/score-badge";
 import NewLeadDialog from "@/components/new-lead-dialog";
 import OwnerSelector from "@/components/owner-selector";
+import StatusNoteEditor from "@/components/status-note-editor";
 import DeleteLeadButton from "@/components/delete-lead-button";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
 import { formatCurrency, formatDateTime, localDateBoundary, relativeTime } from "@/lib/format";
@@ -295,7 +297,7 @@ export default async function LeadsPage({
                 <th className="w-16 px-2.5 py-1.5 font-medium">ID Country</th>
                 <th className="w-20 px-2.5 py-1.5 font-medium">Client country</th>
                 <th className="w-28 px-2.5 py-1.5 font-medium">Category</th>
-                <th className="w-24 px-2.5 py-1.5 font-medium">Stage</th>
+                <th className="w-32 px-2.5 py-1.5 font-medium">Stage</th>
                 {!entryOnly && <th className="w-32 px-2.5 py-1.5 font-medium">Status</th>}
                 {admin && <th className="w-24 px-2.5 py-1.5 font-medium">Entered by</th>}
                 <th className="w-20 px-2.5 py-1.5 font-medium">Last activity</th>
@@ -394,12 +396,21 @@ export default async function LeadsPage({
                   <td className="truncate px-2.5 py-1 text-slate-600">
                     {lead.category ? LEAD_CATEGORY_LABELS[lead.category] : "—"}
                   </td>
-                  <td className="px-2.5 py-1">
-                    <StageBadge name={lead.stage.name} isWon={lead.stage.isWon} isLost={lead.stage.isLost} />
+                  <td className="overflow-hidden px-2.5 py-1">
+                    {entryOnly ? (
+                      <StageBadge name={lead.stage.name} isWon={lead.stage.isWon} isLost={lead.stage.isLost} />
+                    ) : (
+                      <StageSelector
+                        leadId={lead.id}
+                        stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+                        currentStageId={lead.stageId}
+                        compact
+                      />
+                    )}
                   </td>
                   {!entryOnly && (
-                    <td className="truncate px-2.5 py-1 text-slate-600" title={lead.statusNote ?? undefined}>
-                      {lead.statusNote ?? "—"}
+                    <td className="px-1 py-1">
+                      <StatusNoteEditor leadId={lead.id} initialValue={lead.statusNote} />
                     </td>
                   )}
                   {admin && (

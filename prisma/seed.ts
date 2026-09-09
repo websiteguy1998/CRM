@@ -3,6 +3,38 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+/**
+ * Adds a "Voice Mail" stage to every pipeline that doesn't already have one
+ * — for orgs seeded before this stage existed. Placed right before the
+ * Won/Lost terminal stages (shifting their order up by one) rather than
+ * tacked on the end, so it reads as "still working the lead", not a
+ * dead-end column in the pipeline view. Safe to run repeatedly.
+ */
+async function ensureVoiceMailStage() {
+  const pipelines = await prisma.pipeline.findMany({
+    include: { stages: { orderBy: { order: "asc" } } },
+  });
+  for (const pipeline of pipelines) {
+    if (pipeline.stages.some((s) => s.name === "Voice Mail")) continue;
+
+    const terminalOrders = pipeline.stages.filter((s) => s.isWon || s.isLost).map((s) => s.order);
+    const insertOrder = terminalOrders.length > 0 ? Math.min(...terminalOrders) : pipeline.stages.length;
+
+    // Shift everything at/after the insert point up by one, highest order
+    // first, so no two stages briefly collide on the (pipelineId, order)
+    // unique constraint mid-update.
+    const toShift = pipeline.stages.filter((s) => s.order >= insertOrder).sort((a, b) => b.order - a.order);
+    for (const s of toShift) {
+      await prisma.pipelineStage.update({ where: { id: s.id }, data: { order: s.order + 1 } });
+    }
+
+    await prisma.pipelineStage.create({
+      data: { pipelineId: pipeline.id, name: "Voice Mail", order: insertOrder, isWon: false, isLost: false },
+    });
+    console.log(`Added "Voice Mail" stage to pipeline ${pipeline.id}`);
+  }
+}
+
 async function main() {
   // Safe to run on every deploy (e.g. as part of a Vercel build command):
   // skip re-seeding if demo data already exists instead of erroring on
@@ -10,6 +42,7 @@ async function main() {
   const alreadySeeded = await prisma.organization.findFirst();
   if (alreadySeeded) {
     console.log("Demo data already present, skipping seed.");
+    await ensureVoiceMailStage();
     return;
   }
 
@@ -46,8 +79,9 @@ async function main() {
     { name: "Contacted", order: 1 },
     { name: "Interested", order: 2 },
     { name: "Follow-up", order: 3 },
-    { name: "Won", order: 4, isWon: true },
-    { name: "Lost", order: 5, isLost: true },
+    { name: "Voice Mail", order: 4 },
+    { name: "Won", order: 5, isWon: true },
+    { name: "Lost", order: 6, isLost: true },
   ];
   const stages = await Promise.all(
     stageDefs.map((s) =>
@@ -56,7 +90,7 @@ async function main() {
       })
     )
   );
-  const [stageNew, stageContacted, stageInterested, stageFollowUp, stageWon, stageLost] = stages;
+  const [stageNew, stageContacted, stageInterested, stageFollowUp, , stageWon, stageLost] = stages;
 
   const sources = await Promise.all(
     ["Google Ads", "Facebook Ads", "Referral", "Website", "Cold Call"].map((name) =>
