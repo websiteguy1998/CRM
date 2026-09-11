@@ -90,7 +90,13 @@ export default async function UsersSettingsPage() {
                   {session.role === "ADMIN" && (
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
-                        <EditUserDialog userId={u.id} name={u.name} email={u.email} />
+                        <EditUserDialog
+                          userId={u.id}
+                          name={u.name}
+                          email={u.email}
+                          zoomUserEmail={u.zoomUserEmail}
+                          zoomPhoneNumber={u.zoomPhoneNumber}
+                        />
                         {u.id !== session.sub && <DeleteUserButton userId={u.id} name={u.name} />}
                       </div>
                     </td>

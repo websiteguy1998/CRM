@@ -7,10 +7,14 @@ export default function EditUserDialog({
   userId,
   name,
   email,
+  zoomUserEmail,
+  zoomPhoneNumber,
 }: {
   userId: string;
   name: string;
   email: string;
+  zoomUserEmail: string | null;
+  zoomPhoneNumber: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -30,6 +34,8 @@ export default function EditUserDialog({
         body: JSON.stringify({
           name: form.get("name"),
           email: form.get("email"),
+          zoomUserEmail: form.get("zoomUserEmail") || null,
+          zoomPhoneNumber: form.get("zoomPhoneNumber") || null,
           ...(password ? { password } : {}),
         }),
       });
@@ -70,6 +76,25 @@ export default function EditUserDialog({
           <div>
             <label className="label">New password (leave blank to keep current)</label>
             <input name="password" type="password" minLength={8} className="input" />
+          </div>
+          <div>
+            <label className="label">Zoom login email (for call matching)</label>
+            <input
+              name="zoomUserEmail"
+              type="email"
+              defaultValue={zoomUserEmail ?? ""}
+              placeholder="Defaults to their CRM email if left blank"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label">Zoom phone number</label>
+            <input
+              name="zoomPhoneNumber"
+              defaultValue={zoomPhoneNumber ?? ""}
+              placeholder="e.g. (208) 214-3395"
+              className="input"
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>

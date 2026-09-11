@@ -10,6 +10,8 @@ const schema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
+  zoomUserEmail: z.string().email().nullable().optional(),
+  zoomPhoneNumber: z.string().nullable().optional(),
 });
 
 /** Admin-only: approve/reject a pending signup, edit a user's profile, or change role/active state. */
