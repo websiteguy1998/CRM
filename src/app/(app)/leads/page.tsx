@@ -13,7 +13,8 @@ import TimezoneOffsetInput from "@/components/timezone-offset-input";
 import { formatCurrency, formatDateTime, localDateBoundary, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
 import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
-import type { LeadCategory } from "@prisma/client";
+import { getFirstStage } from "@/lib/pipeline";
+import type { LeadCategory, Prisma } from "@prisma/client";
 
 type LeadsSearchParams = {
   q?: string;
@@ -45,7 +46,7 @@ function dedupeCaseInsensitive(values: (string | null)[]): string[] {
   return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
 }
 
-function assignedTabHref(params: LeadsSearchParams, value: "" | "yes" | "no") {
+function assignedTabHref(params: LeadsSearchParams, value: "" | "yes" | "no" | "new") {
   const qs = new URLSearchParams();
   for (const [key, val] of Object.entries(params)) {
     if (key !== "assigned" && val) qs.set(key, val);
@@ -82,53 +83,70 @@ export default async function LeadsPage({
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
   const visWhere = leadWhereForSession(session);
+  const { stage: newStage } = await getFirstStage(session.orgId);
 
-  const [leads, stages, owners, enterers, idCountryRows, clientCountryRows] = await Promise.all([
-    prisma.lead.findMany({
-      where: {
-        organizationId: session.orgId,
-        ...visWhere,
-        ...(stageId ? { stageId } : {}),
-        ...(category ? { category: category as LeadCategory } : {}),
-        ...(admin && createdById ? { createdById } : {}),
-        ...(admin && ownerId
-          ? { ownerId }
-          : admin && assigned === "yes"
-            ? { ownerId: { not: null } }
-            : admin && assigned === "no"
-              ? { ownerId: null }
-              : {}),
-        ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
-        ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
-        ...(admin && contactInfo === "emailOnly" ? { contact: { email: { not: null }, phone: null } } : {}),
-        ...(admin && contactInfo === "phoneOnly" ? { contact: { phone: { not: null }, email: null } } : {}),
-        ...(admin && (from || to)
-          ? {
-              createdAt: {
-                ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
-                ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
+  const leadWhereClause: Prisma.LeadWhereInput = {
+    organizationId: session.orgId,
+    ...visWhere,
+    ...(stageId ? { stageId } : {}),
+    ...(category ? { category: category as LeadCategory } : {}),
+    ...(admin && createdById ? { createdById } : {}),
+    ...(admin && ownerId
+      ? { ownerId }
+      : admin && assigned === "yes"
+        ? { ownerId: { not: null } }
+        : admin && assigned === "no"
+          ? { ownerId: null }
+          : admin && assigned === "new"
+            ? { stageId: newStage.id }
+            : {}),
+    ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
+    ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
+    ...(admin && contactInfo === "emailOnly" ? { contact: { email: { not: null }, phone: null } } : {}),
+    ...(admin && contactInfo === "phoneOnly" ? { contact: { phone: { not: null }, email: null } } : {}),
+    ...(admin && (from || to)
+      ? {
+          createdAt: {
+            ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
+            ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
+          },
+        }
+      : {}),
+    ...(q
+      ? {
+          OR: [
+            { idName: { contains: q, mode: "insensitive" } },
+            { websiteUrl: { contains: q, mode: "insensitive" } },
+            { clientCountry: { contains: q, mode: "insensitive" } },
+            {
+              contact: {
+                OR: [
+                  { firstName: { contains: q, mode: "insensitive" } },
+                  { email: { contains: q, mode: "insensitive" } },
+                  { phone: { contains: q, mode: "insensitive" } },
+                ],
               },
-            }
-          : {}),
-        ...(q
-          ? {
-              OR: [
-                { idName: { contains: q, mode: "insensitive" } },
-                { websiteUrl: { contains: q, mode: "insensitive" } },
-                { clientCountry: { contains: q, mode: "insensitive" } },
-                {
-                  contact: {
-                    OR: [
-                      { firstName: { contains: q, mode: "insensitive" } },
-                      { email: { contains: q, mode: "insensitive" } },
-                      { phone: { contains: q, mode: "insensitive" } },
-                    ],
-                  },
-                },
-              ],
-            }
-          : {}),
-      },
+            },
+          ],
+        }
+      : {}),
+  };
+
+  const [
+    leads,
+    leadCount,
+    stages,
+    owners,
+    enterers,
+    idCountryRows,
+    clientCountryRows,
+    allCount,
+    assignedCount,
+    unassignedCount,
+    newCount,
+  ] = await Promise.all([
+    prisma.lead.findMany({
+      where: leadWhereClause,
       include: { contact: true, stage: true, owner: true, createdBy: true },
       orderBy:
         sort === "deliveryDesc"
@@ -138,6 +156,10 @@ export default async function LeadsPage({
             : { lastActivityAt: "desc" },
       take: 200,
     }),
+    // Accurate total for this exact filter set — the list above is capped
+    // at 200 rows for the table itself, but the count shown in the header
+    // shouldn't be.
+    prisma.lead.count({ where: leadWhereClause }),
     prisma.pipelineStage.findMany({
       where: { pipeline: { organizationId: session.orgId, isDefault: true } },
       orderBy: { order: "asc" },
@@ -158,6 +180,21 @@ export default async function LeadsPage({
       select: { clientCountry: true },
       distinct: ["clientCountry"],
     }),
+    // Stable badge counts for the tabs below — scoped only by visibility,
+    // not by whatever search/category/etc. filters happen to be active,
+    // so they read like inbox-folder totals rather than shifting under you.
+    admin
+      ? prisma.lead.count({ where: { organizationId: session.orgId, ...visWhere } })
+      : Promise.resolve(0),
+    admin
+      ? prisma.lead.count({ where: { organizationId: session.orgId, ...visWhere, ownerId: { not: null } } })
+      : Promise.resolve(0),
+    admin
+      ? prisma.lead.count({ where: { organizationId: session.orgId, ...visWhere, ownerId: null } })
+      : Promise.resolve(0),
+    admin
+      ? prisma.lead.count({ where: { organizationId: session.orgId, ...visWhere, stageId: newStage.id } })
+      : Promise.resolve(0),
   ]);
 
   const idCountryOptions = dedupeCaseInsensitive(idCountryRows.map((r) => r.country));
@@ -168,7 +205,7 @@ export default async function LeadsPage({
       <PageHeader
         title="Leads"
         description={
-          entryOnly ? `${leads.length} leads you entered in the last 24 hours` : `${leads.length} leads`
+          entryOnly ? `${leadCount} leads you entered in the last 24 hours` : `${leadCount} leads`
         }
         actions={
           <>
@@ -186,11 +223,12 @@ export default async function LeadsPage({
           <div className="mb-3 flex gap-1.5">
             {(
               [
-                ["", "All leads"],
-                ["yes", "Assigned leads"],
-                ["no", "Unassigned leads"],
+                ["", "All leads", allCount],
+                ["new", "New leads", newCount],
+                ["yes", "Assigned leads", assignedCount],
+                ["no", "Unassigned leads", unassignedCount],
               ] as const
-            ).map(([value, label]) => {
+            ).map(([value, label, count]) => {
               const active = (assigned ?? "") === value;
               return (
                 <Link
@@ -200,7 +238,7 @@ export default async function LeadsPage({
                     active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {label}
+                  {label} ({count})
                 </Link>
               );
             })}
