@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
@@ -65,7 +66,15 @@ export default async function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="Reports" description="Sales, agent, source and channel performance." />
+      <PageHeader
+        title="Reports"
+        description="Sales, agent, source and channel performance."
+        actions={
+          <Link href="/reports/performance" className="btn-secondary">
+            Lead type × Seller performance
+          </Link>
+        }
+      />
       <div className="space-y-6 p-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
