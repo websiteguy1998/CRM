@@ -28,6 +28,7 @@ type LeadsSearchParams = {
   idCountry?: string;
   clientCountry?: string;
   sort?: string;
+  contactInfo?: string;
 };
 
 /** Country values get typed inconsistently ("Pak" / "PAK" / "pak") — group
@@ -75,6 +76,7 @@ export default async function LeadsPage({
     idCountry,
     clientCountry,
     sort,
+    contactInfo,
   } = params;
   const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
@@ -98,6 +100,8 @@ export default async function LeadsPage({
               : {}),
         ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
         ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
+        ...(admin && contactInfo === "emailOnly" ? { contact: { email: { not: null }, phone: null } } : {}),
+        ...(admin && contactInfo === "phoneOnly" ? { contact: { phone: { not: null }, email: null } } : {}),
         ...(admin && (from || to)
           ? {
               createdAt: {
@@ -251,6 +255,11 @@ export default async function LeadsPage({
           </select>
           {admin && (
             <>
+              <select name="contactInfo" defaultValue={contactInfo ?? ""} className="input max-w-[190px]">
+                <option value="">All contact info</option>
+                <option value="emailOnly">Email only (no phone)</option>
+                <option value="phoneOnly">Phone only (no email)</option>
+              </select>
               <select name="ownerId" defaultValue={ownerId ?? ""} className="input max-w-[160px]">
                 <option value="">All sellers</option>
                 {owners
