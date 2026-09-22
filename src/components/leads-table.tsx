@@ -8,7 +8,7 @@ import StageSelector from "@/components/stage-selector";
 import OwnerSelector from "@/components/owner-selector";
 import StatusNoteEditor from "@/components/status-note-editor";
 import DeleteLeadButton from "@/components/delete-lead-button";
-import { formatCurrency, formatDateTime, relativeTime } from "@/lib/format";
+import { ensureUrlProtocol, formatCurrency, formatDateTime, relativeTime } from "@/lib/format";
 import { LEAD_CATEGORY_LABELS, type LeadCategoryValue } from "@/lib/categories";
 
 export type LeadRow = {
@@ -198,7 +198,7 @@ export default function LeadsTable({
                 <td className="px-2.5 py-1 text-slate-600">
                   {lead.websiteUrl ? (
                     <a
-                      href={lead.websiteUrl}
+                      href={ensureUrlProtocol(lead.websiteUrl)}
                       target="_blank"
                       rel="noreferrer"
                       title={lead.websiteUrl}
@@ -233,7 +233,7 @@ export default function LeadsTable({
                 <td className="px-2.5 py-1 text-slate-600">
                   {lead.idUrl ? (
                     <a
-                      href={lead.idUrl}
+                      href={ensureUrlProtocol(lead.idUrl)}
                       target="_blank"
                       rel="noreferrer"
                       title={lead.idUrl}

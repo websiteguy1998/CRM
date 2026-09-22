@@ -74,6 +74,17 @@ export function formatCurrency(value: number | string, currency = "USD") {
   );
 }
 
+/**
+ * Years of manual entry mean a stored website/ID URL often has no
+ * protocol at all ("abccompany.com"). Used directly as an <a href>, that
+ * resolves as a relative link on the current page instead of navigating
+ * to the actual site. Only prepend a protocol for the href — never touch
+ * what's stored or displayed.
+ */
+export function ensureUrlProtocol(url: string) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 export function channelIcon(channel: "WHATSAPP" | "SMS" | "EMAIL") {
   return { WHATSAPP: "💬", SMS: "📱", EMAIL: "📧" }[channel];
 }
