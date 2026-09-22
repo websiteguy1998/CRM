@@ -48,7 +48,7 @@ export async function findDuplicateLead(
         organizationId,
         OR: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])],
       },
-      include: { leads: { orderBy: { createdAt: "desc" }, take: 1, include: { createdBy: true } } },
+      include: { leads: { orderBy: { createdAt: "desc" }, take: 1, include: { createdBy: true, contact: true } } },
     });
     if (contact?.leads[0]) return contact.leads[0];
   }
@@ -58,6 +58,6 @@ export async function findDuplicateLead(
   return prisma.lead.findFirst({
     where: { organizationId, websiteUrl },
     orderBy: { createdAt: "desc" },
-    include: { createdBy: true },
+    include: { createdBy: true, contact: true },
   });
 }

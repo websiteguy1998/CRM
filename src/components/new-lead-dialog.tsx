@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
+
+type WebsiteDuplicate = { id: string; clientName: string };
 
 export default function NewLeadDialog() {
   const router = useRouter();
@@ -11,6 +13,28 @@ export default function NewLeadDialog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicateLeadId, setDuplicateLeadId] = useState<string | null>(null);
+  const [websiteDuplicate, setWebsiteDuplicate] = useState<WebsiteDuplicate | null>(null);
+  const [checkingWebsite, setCheckingWebsite] = useState(false);
+  const websiteCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function onWebsiteUrlChange(value: string) {
+    if (websiteCheckTimer.current) clearTimeout(websiteCheckTimer.current);
+    if (!value.trim()) {
+      setWebsiteDuplicate(null);
+      setCheckingWebsite(false);
+      return;
+    }
+    setCheckingWebsite(true);
+    websiteCheckTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/leads/check-duplicate?websiteUrl=${encodeURIComponent(value)}`);
+        const data = await res.json().catch(() => ({}));
+        setWebsiteDuplicate(data.duplicate ?? null);
+      } finally {
+        setCheckingWebsite(false);
+      }
+    }, 500);
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,6 +69,7 @@ export default function NewLeadDialog() {
         return;
       }
       setOpen(false);
+      setWebsiteDuplicate(null);
       router.refresh();
     } finally {
       setLoading(false);
@@ -53,7 +78,14 @@ export default function NewLeadDialog() {
 
   if (!open) {
     return (
-      <button className="btn-primary" onClick={() => setOpen(true)}>
+      <button
+        className="btn-primary"
+        onClick={() => {
+          setWebsiteDuplicate(null);
+          setError(null);
+          setOpen(true);
+        }}
+      >
         + New lead
       </button>
     );
@@ -104,7 +136,20 @@ export default function NewLeadDialog() {
             </div>
             <div>
               <label className="label">Website URL</label>
-              <input name="websiteUrl" className="input" />
+              <input
+                name="websiteUrl"
+                className="input"
+                onChange={(e) => onWebsiteUrlChange(e.target.value)}
+              />
+              {checkingWebsite && <p className="mt-1 text-xs text-slate-400">Checking…</p>}
+              {!checkingWebsite && websiteDuplicate && (
+                <p className="mt-1 text-xs text-rose-600">
+                  Already used by {websiteDuplicate.clientName} —{" "}
+                  <Link href={`/leads/${websiteDuplicate.id}`} className="underline">
+                    view lead
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
