@@ -60,6 +60,7 @@ export const NAV_ACCESS: Record<string, SessionPayload["role"][]> = {
   "/": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],
   "/leads": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT", "LEAD_ENTRY"],
   "/sellers": ["ADMIN"],
+  "/lead-entry": ["ADMIN"],
   "/performance": ["AGENT", "MANAGER"],
   "/pipeline": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],
   "/inbox": ["ADMIN", "MANAGER", "QA", "MARKETING", "AGENT"],

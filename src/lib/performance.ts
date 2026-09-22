@@ -72,3 +72,35 @@ export async function getMonthlyPerformance(sellerId: string, months = 12): Prom
       revenue: b.revenue,
     }));
 }
+
+export type MonthlyLeadEntry = { month: string; label: string; leadsAdded: number };
+
+/**
+ * Month-by-month count of leads a Lead Entry user has added, one row per
+ * calendar month for the last `months` months (most recent first) —
+ * counted by when the lead was created, since that's the only thing this
+ * role actually does.
+ */
+export async function getMonthlyLeadEntry(userId: string, months = 12): Promise<MonthlyLeadEntry[]> {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+
+  const leads = await prisma.lead.findMany({
+    where: { createdById: userId, createdAt: { gte: start } },
+    select: { createdAt: true },
+  });
+
+  const buckets = new Map<string, number>();
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    buckets.set(monthKey(d), 0);
+  }
+  for (const lead of leads) {
+    const key = monthKey(lead.createdAt);
+    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, count]) => ({ month: key, label: monthLabel(key), leadsAdded: count }));
+}
