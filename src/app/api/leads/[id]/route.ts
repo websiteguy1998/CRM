@@ -124,21 +124,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 /**
- * Admin-only: permanently delete a lead. Calls aren't deleted — just
- * unlinked (leadId set to null) — so call history/recordings survive on
- * the Calls page even after the lead they were on is removed. The contact
- * is dropped too if this was its only lead.
+ * Permanently delete a lead. A Super Admin can delete any lead; a lead
+ * entry agent can only delete a lead they added themselves, and only
+ * within the same window they're allowed to see/edit it in
+ * (leadWhereForSession) — after that it's admin-only, same as editing.
+ * Calls aren't deleted — just unlinked (leadId set to null) — so call
+ * history/recordings survive on the Calls page even after the lead they
+ * were on is removed. The contact is dropped too if this was its only lead.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
   if ("error" in auth) return auth.error;
-  if (!isAdmin(auth.session.role)) {
-    return NextResponse.json({ error: "Only a Super Admin can delete leads" }, { status: 403 });
+  const admin = isAdmin(auth.session.role);
+  if (!admin && auth.session.role !== "LEAD_ENTRY") {
+    return NextResponse.json({ error: "Not permitted to delete leads" }, { status: 403 });
   }
   const { id } = await params;
   const { orgId } = auth.session;
 
-  const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId } });
+  const lead = await prisma.lead.findFirst({
+    where: { id, organizationId: orgId, ...(admin ? {} : leadWhereForSession(auth.session)) },
+  });
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {

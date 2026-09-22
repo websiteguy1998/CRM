@@ -83,7 +83,12 @@ export default function LeadsTable({
   }
 
   const emptyColSpan =
-    11 + (admin ? 1 : 0) + (entryOnly ? 0 : 2) + (admin ? 2 : 0) + (admin || entryOnly ? 1 : 0);
+    11 +
+    (admin ? 1 : 0) +
+    (entryOnly ? 0 : 2) +
+    (admin ? 1 : 0) +
+    (admin || entryOnly ? 1 : 0) +
+    (admin || entryOnly ? 1 : 0);
 
   return (
     <>
@@ -151,7 +156,7 @@ export default function LeadsTable({
               {!entryOnly && <th className="w-32 px-2.5 py-1.5 font-medium">Status</th>}
               {admin && <th className="w-24 px-2.5 py-1.5 font-medium">Entered by</th>}
               <th className="w-20 px-2.5 py-1.5 font-medium">Last activity</th>
-              {admin && <th className="w-12 px-2.5 py-1.5 font-medium"></th>}
+              {(admin || entryOnly) && <th className="w-12 px-2.5 py-1.5 font-medium"></th>}
             </tr>
           </thead>
           <tbody>
@@ -270,7 +275,7 @@ export default function LeadsTable({
                   <td className="truncate px-2.5 py-1 text-slate-600">{lead.createdBy?.name ?? "—"}</td>
                 )}
                 <td className="truncate px-2.5 py-1 text-slate-400">{relativeTime(lead.lastActivityAt)}</td>
-                {admin && (
+                {(admin || entryOnly) && (
                   <td className="px-2.5 py-1">
                     <DeleteLeadButton leadId={lead.id} name={lead.contact.firstName} />
                   </td>
