@@ -16,22 +16,30 @@ export default function NewLeadDialog() {
   const [websiteDuplicate, setWebsiteDuplicate] = useState<WebsiteDuplicate | null>(null);
   const [checkingWebsite, setCheckingWebsite] = useState(false);
   const websiteCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a slower, earlier request resolving after a newer one
+  // and overwriting the result with a stale answer.
+  const latestWebsiteQuery = useRef("");
 
   function onWebsiteUrlChange(value: string) {
     if (websiteCheckTimer.current) clearTimeout(websiteCheckTimer.current);
     if (!value.trim()) {
+      latestWebsiteQuery.current = "";
       setWebsiteDuplicate(null);
       setCheckingWebsite(false);
       return;
     }
     setCheckingWebsite(true);
     websiteCheckTimer.current = setTimeout(async () => {
+      const queryValue = value;
+      latestWebsiteQuery.current = queryValue;
       try {
-        const res = await fetch(`/api/leads/check-duplicate?websiteUrl=${encodeURIComponent(value)}`);
+        const res = await fetch(`/api/leads/check-duplicate?websiteUrl=${encodeURIComponent(queryValue)}`);
         const data = await res.json().catch(() => ({}));
-        setWebsiteDuplicate(data.duplicate ?? null);
+        if (latestWebsiteQuery.current === queryValue) {
+          setWebsiteDuplicate(data.duplicate ?? null);
+        }
       } finally {
-        setCheckingWebsite(false);
+        if (latestWebsiteQuery.current === queryValue) setCheckingWebsite(false);
       }
     }, 500);
   }
