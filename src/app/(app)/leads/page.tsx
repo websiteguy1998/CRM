@@ -99,6 +99,7 @@ export default async function LeadsPage({
     ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
     ...(admin && contactInfo === "emailOnly" ? { contact: { email: { not: null }, phone: null } } : {}),
     ...(admin && contactInfo === "phoneOnly" ? { contact: { phone: { not: null }, email: null } } : {}),
+    ...(admin && contactInfo === "phoneMandatory" ? { contact: { phone: { not: null } } } : {}),
     ...(admin && (from || to)
       ? {
           createdAt: {
@@ -313,10 +314,11 @@ export default async function LeadsPage({
           </select>
           {admin && (
             <>
-              <select name="contactInfo" defaultValue={contactInfo ?? ""} className="input max-w-[190px]">
+              <select name="contactInfo" defaultValue={contactInfo ?? ""} className="input max-w-[210px]">
                 <option value="">All contact info</option>
-                <option value="emailOnly">Email only (no phone)</option>
-                <option value="phoneOnly">Phone only (no email)</option>
+                <option value="phoneOnly">Only phone (no email)</option>
+                <option value="emailOnly">Only email (no phone)</option>
+                <option value="phoneMandatory">Phone mandatory, email optional</option>
               </select>
               <select name="ownerId" defaultValue={ownerId ?? ""} className="input max-w-[160px]">
                 <option value="">All sellers</option>
