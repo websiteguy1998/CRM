@@ -263,7 +263,13 @@ export default function LeadsTable({
                   {entryOnly ? (
                     <StageBadge name={lead.stage.name} isWon={lead.stage.isWon} isLost={lead.stage.isLost} />
                   ) : (
-                    <StageSelector leadId={lead.id} stages={stages} currentStageId={lead.stageId} compact />
+                    <StageSelector
+                      leadId={lead.id}
+                      stages={stages}
+                      currentStageId={lead.stageId}
+                      currentPrice={lead.price}
+                      compact
+                    />
                   )}
                 </td>
                 {!entryOnly && (

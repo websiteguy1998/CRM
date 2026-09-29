@@ -85,7 +85,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {entryOnly ? (
                   <p className="input flex items-center bg-slate-50 text-slate-500">{lead.stage.name}</p>
                 ) : (
-                  <StageSelector leadId={lead.id} stages={lead.pipeline.stages} currentStageId={lead.stageId} />
+                  <StageSelector
+                    leadId={lead.id}
+                    stages={lead.pipeline.stages}
+                    currentStageId={lead.stageId}
+                    currentPrice={lead.price != null ? Number(lead.price) : null}
+                  />
                 )}
               </div>
               <div>
@@ -176,6 +181,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               leadId={lead.id}
               initialStatusNote={lead.statusNote}
               initialPrice={lead.price != null ? String(lead.price) : null}
+              isWon={lead.stage.isWon}
             />
           )}
 

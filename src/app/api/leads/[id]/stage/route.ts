@@ -6,7 +6,13 @@ import { logActivity } from "@/lib/timeline";
 import { recalculateLeadScore } from "@/lib/scoring";
 import { leadWhereForSession } from "@/lib/access";
 
-const schema = z.object({ stageId: z.string().min(1) });
+const schema = z.object({
+  stageId: z.string().min(1),
+  // Set together with the stage move so marking a lead Won and recording
+  // what it closed for happens in one save instead of two — see the
+  // win-amount prompt in StageSelector.
+  price: z.coerce.number().min(0).optional(),
+});
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
@@ -36,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: {
       stageId: newStage.id,
       status: newStage.isWon ? "WON" : newStage.isLost ? "LOST" : "OPEN",
+      ...(parsed.data.price !== undefined ? { price: parsed.data.price } : {}),
     },
     include: { stage: true },
   });
