@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import StageBadge from "@/components/stage-badge";
+import DeleteRecordingButton from "@/components/delete-recording-button";
 import { formatCurrency, formatDateTime, relativeTime } from "@/lib/format";
 import type { MonthlyPerformance } from "@/lib/performance";
 
@@ -20,12 +21,15 @@ type Call = {
   status: string;
   durationSec: number;
   startedAt: Date;
+  recordingUrl: string | null;
 };
 
 /**
  * Shared between the Super Admin's /sellers/[id] view and a seller's own
  * /performance page — same stats, same monthly record, so an admin and
  * the agent themselves are always looking at identical numbers.
+ * canDeleteRecordings is only passed true from the admin's /sellers/[id]
+ * view — a seller can't delete their own call recordings from /performance.
  */
 export default function SellerProfile({
   seller,
@@ -34,6 +38,7 @@ export default function SellerProfile({
   todayLeadCount,
   monthly,
   actions,
+  canDeleteRecordings,
 }: {
   seller: Seller;
   leads: Lead[];
@@ -41,6 +46,7 @@ export default function SellerProfile({
   todayLeadCount: number;
   monthly: MonthlyPerformance[];
   actions?: ReactNode;
+  canDeleteRecordings?: boolean;
 }) {
   const open = leads.filter((l) => l.status === "OPEN").length;
   const won = leads.filter((l) => l.status === "WON");
@@ -165,6 +171,12 @@ export default function SellerProfile({
                     </span>
                     <span className="text-xs text-slate-400">{formatDateTime(c.startedAt)}</span>
                   </div>
+                  {c.recordingUrl && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <audio controls preload="none" src={c.recordingUrl} className="h-8 w-full" />
+                      {canDeleteRecordings && <DeleteRecordingButton callId={c.id} />}
+                    </div>
+                  )}
                 </li>
               ))}
               {calls.length === 0 && <li className="text-slate-400">No calls logged yet.</li>}

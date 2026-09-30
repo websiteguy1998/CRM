@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
 import PendingCallSync from "@/components/pending-call-sync";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
+import DeleteRecordingButton from "@/components/delete-recording-button";
 import { formatDateTime, localDateBoundary } from "@/lib/format";
-import { hasFullLeadVisibility, leadWhereForSession } from "@/lib/access";
+import { hasFullLeadVisibility, isAdmin, leadWhereForSession } from "@/lib/access";
 import type { CallDirection, CallStatus, Prisma } from "@prisma/client";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -33,6 +34,7 @@ export default async function CallsPage({
   const { q, agentId, direction, status, from, to, tzOffset } = await searchParams;
   const tzOffsetMinutes = Number(tzOffset) || 0;
   const fullVisibility = hasFullLeadVisibility(session.role);
+  const admin = isAdmin(session.role);
 
   const [calls, agents] = await Promise.all([
     prisma.call.findMany({
@@ -177,7 +179,10 @@ export default async function CallsPage({
                     </td>
                     <td className="px-4 py-2.5">
                       {call.recordingUrl ? (
-                        <audio controls preload="none" src={call.recordingUrl} className="h-8 w-40" />
+                        <div className="flex items-center gap-2">
+                          <audio controls preload="none" src={call.recordingUrl} className="h-8 w-40" />
+                          {admin && <DeleteRecordingButton callId={call.id} />}
+                        </div>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}

@@ -55,6 +55,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
       calls={calls}
       todayLeadCount={todayLeadCount}
       monthly={monthly}
+      canDeleteRecordings
       actions={
         <Link href="/sellers" className="btn-secondary">
           ← All sellers

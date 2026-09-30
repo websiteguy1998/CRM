@@ -25,7 +25,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const call = await prisma.call.findFirst({ where: { id: callId, leadId: id } });
-  if (!call?.externalId) return NextResponse.json({ error: "No recording for this call" }, { status: 404 });
+  if (!call?.externalId || call.recordingDeleted) {
+    return NextResponse.json({ error: "No recording for this call" }, { status: 404 });
+  }
 
   const info = await getCallRecordingDownloadInfo(auth.session.orgId, {
     callId: call.externalId,

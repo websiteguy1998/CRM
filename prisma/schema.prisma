@@ -45,30 +45,30 @@ enum Role {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  name           String
-  email          String   @unique
-  passwordHash   String
-  role           Role     @default(AGENT)
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  email           String       @unique
+  passwordHash    String
+  role            Role         @default(AGENT)
   // false = pending admin approval (self-signups start here); an
   // admin-created user (Settings -> Add user) starts true.
-  active         Boolean  @default(true)
+  active          Boolean      @default(true)
   // The Zoom account (usually their work email) this agent places
   // click-to-call calls from. Self-service — set from the Call tab.
-  zoomUserEmail  String?
+  zoomUserEmail   String?
   // The Zoom Phone number assigned to zoomUserEmail in Zoom's own admin
   // panel. We don't set this — it's filled in automatically the first
   // time a synced call resolves this agent, purely for display (Settings
   // -> Users) so an admin can see the number-to-agent mapping.
   zoomPhoneNumber String?
-  createdAt      DateTime @default(now())
+  createdAt       DateTime     @default(now())
 
   teamMemberships TeamMember[]
-  ownedLeads      Lead[]        @relation("LeadOwner")
-  createdLeads    Lead[]        @relation("LeadCreatedBy")
-  assignedTasks   Task[]        @relation("TaskAssignee")
+  ownedLeads      Lead[]             @relation("LeadOwner")
+  createdLeads    Lead[]             @relation("LeadCreatedBy")
+  assignedTasks   Task[]             @relation("TaskAssignee")
   calls           Call[]
   notes           Note[]
   activities      Activity[]
@@ -90,7 +90,7 @@ model SignupVerification {
 }
 
 model Team {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
@@ -113,7 +113,7 @@ model TeamMember {
 // ---------------------------------------------------------------------------
 
 model Company {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
@@ -122,23 +122,23 @@ model Company {
   city           String?
   state          String?
   country        String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   contacts Contact[]
   leads    Lead[]
 }
 
 model Contact {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   companyId      String?
-  company        Company? @relation(fields: [companyId], references: [id])
+  company        Company?     @relation(fields: [companyId], references: [id])
   firstName      String
   lastName       String?
   email          String?
   phone          String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   leads Lead[]
 
@@ -147,7 +147,7 @@ model Contact {
 }
 
 model LeadSource {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
@@ -159,23 +159,23 @@ model LeadSource {
 }
 
 model Campaign {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   sourceId       String?
-  source         LeadSource? @relation(fields: [sourceId], references: [id])
-  createdAt      DateTime    @default(now())
+  source         LeadSource?  @relation(fields: [sourceId], references: [id])
+  createdAt      DateTime     @default(now())
 
   leads Lead[]
 }
 
 model Pipeline {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
-  isDefault      Boolean  @default(false)
+  isDefault      Boolean      @default(false)
 
   stages PipelineStage[]
   leads  Lead[]
@@ -190,9 +190,9 @@ model PipelineStage {
   isWon      Boolean  @default(false)
   isLost     Boolean  @default(false)
 
-  leads          Lead[]
-  historyFrom    LeadStageHistory[] @relation("StageFrom")
-  historyTo      LeadStageHistory[] @relation("StageTo")
+  leads       Lead[]
+  historyFrom LeadStageHistory[] @relation("StageFrom")
+  historyTo   LeadStageHistory[] @relation("StageTo")
 
   @@unique([pipelineId, order])
 }
@@ -213,27 +213,27 @@ enum LeadCategory {
 }
 
 model Lead {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id])
   contactId      String
-  contact        Contact      @relation(fields: [contactId], references: [id])
+  contact        Contact       @relation(fields: [contactId], references: [id])
   companyId      String?
-  company        Company?     @relation(fields: [companyId], references: [id])
+  company        Company?      @relation(fields: [companyId], references: [id])
   sourceId       String?
-  source         LeadSource?  @relation(fields: [sourceId], references: [id])
+  source         LeadSource?   @relation(fields: [sourceId], references: [id])
   campaignId     String?
-  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id])
   pipelineId     String
-  pipeline       Pipeline     @relation(fields: [pipelineId], references: [id])
+  pipeline       Pipeline      @relation(fields: [pipelineId], references: [id])
   stageId        String
   stage          PipelineStage @relation(fields: [stageId], references: [id])
   ownerId        String?
-  owner          User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  owner          User?         @relation("LeadOwner", fields: [ownerId], references: [id])
   createdById    String?
-  createdBy      User?        @relation("LeadCreatedBy", fields: [createdById], references: [id])
-  status         LeadStatus   @default(OPEN)
-  score          Int          @default(0)
+  createdBy      User?         @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  status         LeadStatus    @default(OPEN)
+  score          Int           @default(0)
   scoreReasons   Json?
 
   // Sheet-style fields (id name/url = the client's profile on the
@@ -246,14 +246,14 @@ model Lead {
   country       String?
   clientCountry String?
   deliveryDate  DateTime?
-  price         Decimal?  @db.Decimal(12, 2)
+  price         Decimal?      @db.Decimal(12, 2)
   duration      String?
   statusNote    String?
   category      LeadCategory?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  lastActivityAt DateTime     @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastActivityAt DateTime @default(now())
 
   conversations Conversation[]
   calls         Call[]
@@ -271,24 +271,24 @@ model Lead {
 }
 
 model LeadStageHistory {
-  id            String         @id @default(cuid())
-  leadId        String
-  lead          Lead           @relation(fields: [leadId], references: [id])
-  fromStageId   String?
-  fromStage     PipelineStage? @relation("StageFrom", fields: [fromStageId], references: [id])
-  toStageId     String
-  toStage       PipelineStage  @relation("StageTo", fields: [toStageId], references: [id])
-  changedById   String?
-  changedBy     User?          @relation(fields: [changedById], references: [id])
-  changedAt     DateTime       @default(now())
+  id          String         @id @default(cuid())
+  leadId      String
+  lead        Lead           @relation(fields: [leadId], references: [id])
+  fromStageId String?
+  fromStage   PipelineStage? @relation("StageFrom", fields: [fromStageId], references: [id])
+  toStageId   String
+  toStage     PipelineStage  @relation("StageTo", fields: [toStageId], references: [id])
+  changedById String?
+  changedBy   User?          @relation(fields: [changedById], references: [id])
+  changedAt   DateTime       @default(now())
 }
 
 model Tag {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
-  color          String   @default("#6366f1")
+  color          String       @default("#6366f1")
 
   leads LeadTag[]
 
@@ -347,18 +347,18 @@ model Conversation {
 }
 
 model Message {
-  id             String            @id @default(cuid())
+  id             String           @id @default(cuid())
   conversationId String
-  conversation   Conversation      @relation(fields: [conversationId], references: [id])
+  conversation   Conversation     @relation(fields: [conversationId], references: [id])
   direction      MessageDirection
-  status         MessageStatus     @default(SENT)
+  status         MessageStatus    @default(SENT)
   body           String?
   mediaUrl       String?
   externalId     String?
   sentById       String?
-  sentBy         User?             @relation(fields: [sentById], references: [id])
+  sentBy         User?            @relation(fields: [sentById], references: [id])
   openedAt       DateTime?
-  createdAt      DateTime          @default(now())
+  createdAt      DateTime         @default(now())
 
   attachments Attachment[]
 }
@@ -385,28 +385,35 @@ enum CallStatus {
 }
 
 model Call {
-  id             String        @id @default(cuid())
-  organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id])
-  leadId         String?
-  lead           Lead?         @relation(fields: [leadId], references: [id])
-  agentId        String?
-  agent          User?         @relation(fields: [agentId], references: [id])
-  direction      CallDirection
-  status         CallStatus
-  fromNumber     String?
-  toNumber       String?
-  startedAt      DateTime      @default(now())
-  durationSec    Int           @default(0)
-  recordingUrl   String?
+  id               String        @id @default(cuid())
+  organizationId   String
+  organization     Organization  @relation(fields: [organizationId], references: [id])
+  leadId           String?
+  lead             Lead?         @relation(fields: [leadId], references: [id])
+  agentId          String?
+  agent            User?         @relation(fields: [agentId], references: [id])
+  direction        CallDirection
+  status           CallStatus
+  fromNumber       String?
+  toNumber         String?
+  startedAt        DateTime      @default(now())
+  durationSec      Int           @default(0)
+  recordingUrl     String?
   // Zoom's per-leg call log "id" (distinct from externalId, which is the
   // shared call_id both legs report) — the recordings sub-resource
   // endpoint needs this specific id, not call_id.
-  recordingLogId String?
-  transcript     String?
-  aiSummary      String?
-  nextAction     String?
-  externalId     String?
+  recordingLogId   String?
+  // A Super Admin deleted this call's recording. Kept separate from just
+  // clearing recordingUrl/recordingLogId — those fields also start out
+  // empty before a recording arrives, and Zoom's webhook/backfill sync
+  // would otherwise re-attach the recording the next time it sees this
+  // call still marked "recorded" upstream. This flag makes the deletion
+  // stick.
+  recordingDeleted Boolean       @default(false)
+  transcript       String?
+  aiSummary        String?
+  nextAction       String?
+  externalId       String?
 
   @@index([organizationId, leadId])
 }
@@ -541,7 +548,7 @@ model IntegrationAccount {
 }
 
 model Template {
-  id             String  @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   channel        Channel

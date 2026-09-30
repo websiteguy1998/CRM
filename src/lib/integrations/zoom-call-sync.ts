@@ -141,10 +141,14 @@ export async function recordZoomCallLog(
       data.durationSec = durationSec;
       data.status = status;
     }
-    if (recorded && !existing.recordingUrl) {
+    // A Super Admin deleting a recording (recordingDeleted) must stick even
+    // if Zoom still reports this call as recorded on a later webhook
+    // delivery or backfill sync — otherwise the "delete" would silently
+    // undo itself the next time this call log is seen.
+    if (recorded && !existing.recordingUrl && !existing.recordingDeleted) {
       data.recordingUrl = recordingUrlFor(existing.leadId, existing.id);
     }
-    if (recorded && logId && !existing.recordingLogId) {
+    if (recorded && logId && !existing.recordingLogId && !existing.recordingDeleted) {
       data.recordingLogId = logId;
     }
     if (Object.keys(data).length > 0) {
