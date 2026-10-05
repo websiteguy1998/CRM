@@ -55,14 +55,25 @@ export default async function ReportsPage() {
   const answeredCalls = calls.find((c) => c.status === "ANSWERED")?._count._all ?? 0;
   const callAnswerRate = totalCalls ? ((answeredCalls / totalCalls) * 100).toFixed(0) : "0";
 
-  const agentRows = await Promise.all(
-    agents.map(async (a) => {
-      const won = await prisma.lead.findMany({ where: { ownerId: a.id, status: "WON" }, select: { price: true } });
-      const revenue = won.reduce((s, l) => s + (l.price != null ? Number(l.price) : 0), 0);
-      const rate = a.ownedLeads.length ? ((won.length / a.ownedLeads.length) * 100).toFixed(1) : "0.0";
-      return { name: a.name, leads: a.ownedLeads.length, calls: a.calls.length, deals: won.length, revenue, rate };
-    })
-  );
+  // One groupBy for every agent's won deals instead of a query per agent in
+  // a loop — scales with one extra round-trip total, not one per agent.
+  const wonByOwner = agents.length
+    ? await prisma.lead.groupBy({
+        by: ["ownerId"],
+        where: { organizationId: orgId, status: "WON", ownerId: { in: agents.map((a) => a.id) } },
+        _sum: { price: true },
+        _count: { _all: true },
+      })
+    : [];
+  const wonByOwnerMap = new Map(wonByOwner.map((w) => [w.ownerId, w]));
+
+  const agentRows = agents.map((a) => {
+    const won = wonByOwnerMap.get(a.id);
+    const deals = won?._count._all ?? 0;
+    const revenue = won?._sum.price != null ? Number(won._sum.price) : 0;
+    const rate = a.ownedLeads.length ? ((deals / a.ownedLeads.length) * 100).toFixed(1) : "0.0";
+    return { name: a.name, leads: a.ownedLeads.length, calls: a.calls.length, deals, revenue, rate };
+  });
 
   return (
     <div>

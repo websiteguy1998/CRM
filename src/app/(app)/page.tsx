@@ -114,24 +114,33 @@ export default async function DashboardPage() {
       : Promise.resolve(0),
   ]);
 
-  const leaderboard = await Promise.all(
-    agents.map(async (agent) => {
-      const wonLeads = await prisma.lead.findMany({
-        where: { ownerId: agent.id, status: "WON" },
-        select: { price: true },
-      });
-      const revenue = wonLeads.reduce((sum, l) => sum + (l.price != null ? Number(l.price) : 0), 0);
+  // One groupBy for every agent's won deals instead of a query per agent in
+  // a loop — the dashboard loads on every login, so an org with a growing
+  // sales team would otherwise mean a growing number of sequential
+  // round-trips to the database on the very first page people see.
+  const wonByOwner = agents.length
+    ? await prisma.lead.groupBy({
+        by: ["ownerId"],
+        where: { organizationId: orgId, status: "WON", ownerId: { in: agents.map((a) => a.id) } },
+        _sum: { price: true },
+        _count: { _all: true },
+      })
+    : [];
+  const wonByOwnerMap = new Map(wonByOwner.map((w) => [w.ownerId, w]));
+
+  const leaderboard = agents
+    .map((agent) => {
+      const won = wonByOwnerMap.get(agent.id);
       return {
         id: agent.id,
         name: agent.name,
         leads: agent._count.ownedLeads,
         calls: agent.calls.length,
-        deals: wonLeads.length,
-        revenue,
+        deals: won?._count._all ?? 0,
+        revenue: won?._sum.price != null ? Number(won._sum.price) : 0,
       };
     })
-  );
-  leaderboard.sort((a, b) => b.revenue - a.revenue);
+    .sort((a, b) => b.revenue - a.revenue);
 
   const stats = [
     { label: fullAccess ? "New leads today" : "Assigned to you today", value: newLeadsToday },
