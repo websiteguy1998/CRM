@@ -18,6 +18,31 @@ export function localDateBoundary(
   return new Date(base + tzOffsetMinutes * 60_000);
 }
 
+/**
+ * The UTC instant of local midnight for whatever calendar day it is right
+ * now in the viewer's timezone — the "today" equivalent of
+ * localDateBoundary, for stats pages that compute "today"/"this month"
+ * without a date-picker form to carry tzOffset through (see
+ * TimezoneCookieSync, which is where tzOffsetMinutes comes from on these
+ * pages). The server's own clock is on UTC, so without this, "today"
+ * silently uses the UTC calendar day instead of the viewer's.
+ */
+export function localStartOfToday(tzOffsetMinutes: number) {
+  const localNow = new Date(Date.now() - tzOffsetMinutes * 60_000);
+  const y = localNow.getUTCFullYear();
+  const m = String(localNow.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(localNow.getUTCDate()).padStart(2, "0");
+  return localDateBoundary(`${y}-${m}-${d}`, tzOffsetMinutes);
+}
+
+/** Same idea as localStartOfToday, but the 1st of the viewer's local calendar month. */
+export function localStartOfMonth(tzOffsetMinutes: number) {
+  const localNow = new Date(Date.now() - tzOffsetMinutes * 60_000);
+  const y = localNow.getUTCFullYear();
+  const m = String(localNow.getUTCMonth() + 1).padStart(2, "0");
+  return localDateBoundary(`${y}-${m}-01`, tzOffsetMinutes);
+}
+
 export function initials(name: string) {
   return name
     .split(" ")

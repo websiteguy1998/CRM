@@ -1,21 +1,16 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { formatCurrency, relativeTime } from "@/lib/format";
+import { formatCurrency, relativeTime, localStartOfToday } from "@/lib/format";
 import { hasFullLeadVisibility, isAdmin, leadWhereForSession } from "@/lib/access";
+import { getViewerTzOffset } from "@/lib/timezone";
 import Link from "next/link";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
 
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
   const orgId = session.orgId;
-  const today = startOfToday();
+  const today = localStartOfToday(await getViewerTzOffset());
   const fullAccess = hasFullLeadVisibility(session.role);
   const leadWhere = leadWhereForSession(session);
 

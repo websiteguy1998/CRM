@@ -2,12 +2,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import SellerProfile from "@/components/seller-profile";
 import { getMonthlyPerformance } from "@/lib/performance";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { localStartOfToday } from "@/lib/format";
+import { getViewerTzOffset } from "@/lib/timezone";
 
 /** A seller's own view of the same monthly record a Super Admin sees on their /sellers/[id] profile. */
 export default async function MyPerformancePage() {
@@ -17,6 +13,7 @@ export default async function MyPerformancePage() {
 
   const seller = await prisma.user.findUnique({ where: { id: session.sub } });
   if (!seller) return null;
+  const today = localStartOfToday(await getViewerTzOffset());
 
   const [leads, calls, assignedToday, monthly] = await Promise.all([
     prisma.lead.findMany({
@@ -33,7 +30,7 @@ export default async function MyPerformancePage() {
       where: {
         organizationId: session.orgId,
         type: "LEAD_ASSIGNED",
-        createdAt: { gte: startOfToday() },
+        createdAt: { gte: today },
         lead: { ownerId: session.sub },
       },
       select: { leadId: true },

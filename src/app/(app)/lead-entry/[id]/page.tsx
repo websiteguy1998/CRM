@@ -3,19 +3,10 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, localStartOfToday, localStartOfMonth } from "@/lib/format";
 import { isAdmin } from "@/lib/access";
 import { getMonthlyLeadEntry } from "@/lib/performance";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function startOfMonth() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
+import { getViewerTzOffset } from "@/lib/timezone";
 
 export default async function LeadEntryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -37,9 +28,10 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
     getMonthlyLeadEntry(user.id),
   ]);
 
-  const today = startOfToday();
+  const tzOffsetMinutes = await getViewerTzOffset();
+  const today = localStartOfToday(tzOffsetMinutes);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const monthStart = startOfMonth();
+  const monthStart = localStartOfMonth(tzOffsetMinutes);
 
   const todayCount = leads.filter((l) => l.createdAt >= today).length;
   const weekCount = leads.filter((l) => l.createdAt >= weekAgo).length;

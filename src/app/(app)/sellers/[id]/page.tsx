@@ -5,12 +5,8 @@ import { prisma } from "@/lib/prisma";
 import SellerProfile from "@/components/seller-profile";
 import { isAdmin } from "@/lib/access";
 import { getMonthlyPerformance } from "@/lib/performance";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { localStartOfToday } from "@/lib/format";
+import { getViewerTzOffset } from "@/lib/timezone";
 
 export default async function SellerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -22,6 +18,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
     where: { id, organizationId: session.orgId, role: { in: ["AGENT", "MANAGER"] } },
   });
   if (!seller) notFound();
+  const today = localStartOfToday(await getViewerTzOffset());
 
   const [leads, calls, assignedToday, monthly] = await Promise.all([
     prisma.lead.findMany({
@@ -38,7 +35,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
       where: {
         organizationId: session.orgId,
         type: "LEAD_ASSIGNED",
-        createdAt: { gte: startOfToday() },
+        createdAt: { gte: today },
         lead: { ownerId: seller.id },
       },
       select: { leadId: true },

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, localStartOfToday } from "@/lib/format";
+import { getViewerTzOffset } from "@/lib/timezone";
 
 type SellerStats = {
   total: number;
@@ -13,15 +14,10 @@ type SellerStats = {
   wonValue: number;
 };
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export default async function SellersPage() {
   const session = await getSession();
   if (!session) return null;
+  const today = localStartOfToday(await getViewerTzOffset());
 
   const [sellers, ownedLeads, assignedToday] = await Promise.all([
     prisma.user.findMany({
@@ -41,7 +37,7 @@ export default async function SellersPage() {
       where: {
         organizationId: session.orgId,
         type: "LEAD_ASSIGNED",
-        createdAt: { gte: startOfToday() },
+        createdAt: { gte: today },
         lead: { ownerId: { not: null } },
       },
       select: { leadId: true, lead: { select: { ownerId: true } } },

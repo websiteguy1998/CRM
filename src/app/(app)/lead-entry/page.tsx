@@ -2,18 +2,9 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, localStartOfToday, localStartOfMonth } from "@/lib/format";
 import { isAdmin } from "@/lib/access";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function startOfMonth() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
+import { getViewerTzOffset } from "@/lib/timezone";
 
 type Stats = {
   total: number;
@@ -39,9 +30,10 @@ export default async function LeadEntryPage() {
     select: { createdById: true, createdAt: true, ownerId: true },
   });
 
-  const today = startOfToday();
+  const tzOffsetMinutes = await getViewerTzOffset();
+  const today = localStartOfToday(tzOffsetMinutes);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const monthStart = startOfMonth();
+  const monthStart = localStartOfMonth(tzOffsetMinutes);
 
   const statsByUser = new Map<string, Stats>();
   for (const lead of leads) {
