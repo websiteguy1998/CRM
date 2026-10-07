@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { relativeTime, localStartOfToday, localStartOfMonth } from "@/lib/format";
+import { relativeTime, localStartOfMonth } from "@/lib/format";
 import { isAdmin } from "@/lib/access";
 import { getMonthlyLeadEntry } from "@/lib/performance";
 import { getViewerTzOffset } from "@/lib/timezone";
+import { currentShiftWindow } from "@/lib/shift";
 
 export default async function LeadEntryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -29,18 +30,19 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
   ]);
 
   const tzOffsetMinutes = await getViewerTzOffset();
-  const today = localStartOfToday(tzOffsetMinutes);
+  // Same overnight-shift definition of "today" as the Lead Entry list page.
+  const { start: shiftStart, end: shiftEnd } = currentShiftWindow();
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const monthStart = localStartOfMonth(tzOffsetMinutes);
 
-  const todayCount = leads.filter((l) => l.createdAt >= today).length;
+  const todayCount = leads.filter((l) => l.createdAt >= shiftStart && l.createdAt < shiftEnd).length;
   const weekCount = leads.filter((l) => l.createdAt >= weekAgo).length;
   const monthCount = leads.filter((l) => l.createdAt >= monthStart).length;
   const unassigned = leads.filter((l) => !l.ownerId).length;
   const assigned = leads.length - unassigned;
 
   const stats = [
-    { label: "Today", value: todayCount },
+    { label: "Today (9pm–6am PKT shift)", value: todayCount },
     { label: "This week", value: weekCount },
     { label: "This month", value: monthCount },
     { label: "Total added", value: leads.length },

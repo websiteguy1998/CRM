@@ -2,9 +2,10 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
-import { relativeTime, localStartOfToday, localStartOfMonth } from "@/lib/format";
+import { relativeTime, localStartOfMonth } from "@/lib/format";
 import { isAdmin } from "@/lib/access";
 import { getViewerTzOffset } from "@/lib/timezone";
+import { currentShiftWindow } from "@/lib/shift";
 
 type Stats = {
   total: number;
@@ -31,7 +32,11 @@ export default async function LeadEntryPage() {
   });
 
   const tzOffsetMinutes = await getViewerTzOffset();
-  const today = localStartOfToday(tzOffsetMinutes);
+  // "Today" tracks the lead-entry team's actual overnight shift (9pm–6am
+  // Pakistan time) rather than a calendar day — a lead entered at 2am is
+  // still part of tonight's shift, and the count should keep showing that
+  // whole shift's total through the following day until the next one starts.
+  const { start: shiftStart, end: shiftEnd } = currentShiftWindow();
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const monthStart = localStartOfMonth(tzOffsetMinutes);
 
@@ -47,7 +52,7 @@ export default async function LeadEntryPage() {
       lastAddedAt: null,
     };
     s.total += 1;
-    if (lead.createdAt >= today) s.today += 1;
+    if (lead.createdAt >= shiftStart && lead.createdAt < shiftEnd) s.today += 1;
     if (lead.createdAt >= weekAgo) s.thisWeek += 1;
     if (lead.createdAt >= monthStart) s.thisMonth += 1;
     if (!lead.ownerId) s.unassigned += 1;
@@ -67,7 +72,9 @@ export default async function LeadEntryPage() {
                 <th className="w-40 px-2.5 py-1.5 font-medium">Name</th>
                 <th className="w-48 px-2.5 py-1.5 font-medium">Email</th>
                 <th className="w-20 px-2.5 py-1.5 font-medium">Status</th>
-                <th className="w-16 px-2.5 py-1.5 font-medium">Today</th>
+                <th className="w-16 px-2.5 py-1.5 font-medium" title="Current/most recent shift: 9pm–6am PKT">
+                  Today
+                </th>
                 <th className="w-20 px-2.5 py-1.5 font-medium">This week</th>
                 <th className="w-24 px-2.5 py-1.5 font-medium">This month</th>
                 <th className="w-24 px-2.5 py-1.5 font-medium">Total added</th>
