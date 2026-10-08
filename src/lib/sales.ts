@@ -50,6 +50,27 @@ export async function recordInitialSale(
   await recalculateLeadPrice(db, params.leadId);
 }
 
+/**
+ * Edits an existing sale in place — amount on any sale, description on an
+ * upsell (an INITIAL sale's description stays null; it's just "the deal",
+ * not a named line item). Used by the Sales panel's per-row edit.
+ */
+export async function updateSale(
+  db: Db,
+  saleId: string,
+  changes: { amount?: number; description?: string }
+) {
+  const sale = await db.sale.update({
+    where: { id: saleId },
+    data: {
+      ...(changes.amount !== undefined ? { amount: changes.amount } : {}),
+      ...(changes.description !== undefined ? { description: changes.description } : {}),
+    },
+  });
+  await recalculateLeadPrice(db, sale.leadId);
+  return sale;
+}
+
 /** Adds a new upsell — always a new line, since a lead can have several over time. */
 export async function recordUpsell(
   db: Db,
