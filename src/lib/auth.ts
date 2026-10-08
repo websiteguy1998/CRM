@@ -18,6 +18,7 @@ export type SessionPayload = {
   role: Role;
   name: string;
   email: string;
+  iat?: number; // JWT standard claim (seconds since epoch), set by setIssuedAt() — used to honor force-logout-all
 };
 
 export async function createSessionToken(payload: SessionPayload) {
@@ -58,7 +59,26 @@ export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+
+  // The "Switch" button (force logout everyone) sets this instead of
+  // keeping a server-side session list — a token issued before it just
+  // stops being honored, even though its signature and expiry are still
+  // fine on their own.
+  const org = await prisma.organization.findUnique({
+    where: { id: session.orgId },
+    select: { sessionsInvalidatedAt: true },
+  });
+  if (
+    org?.sessionsInvalidatedAt &&
+    session.iat != null &&
+    session.iat * 1000 < org.sessionsInvalidatedAt.getTime()
+  ) {
+    return null;
+  }
+
+  return session;
 }
 
 export async function requireSession(): Promise<SessionPayload> {

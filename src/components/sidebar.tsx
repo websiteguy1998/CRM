@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/auth";
-import { canAccess } from "@/lib/access";
+import { canAccess, isAdmin } from "@/lib/access";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: "🏠" },
@@ -23,11 +24,28 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
   const pathname = usePathname();
   const router = useRouter();
   const visibleNav = NAV.filter((item) => canAccess(session.role, item.href));
+  const [switching, setSwitching] = useState(false);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
+  }
+
+  async function forceLogoutAll() {
+    if (
+      !confirm(
+        "This logs out every user right now — every lead entry agent, every sales agent, and you too. Everyone will have to sign in again. Continue?"
+      )
+    ) {
+      return;
+    }
+    setSwitching(true);
+    try {
+      await fetch("/api/auth/force-logout-all", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
   }
 
   return (
@@ -38,6 +56,18 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
         </div>
         <span className="text-sm font-semibold text-slate-900">Unify CRM</span>
       </div>
+      {isAdmin(session.role) && (
+        <div className="px-3 pb-3">
+          <button
+            onClick={forceLogoutAll}
+            disabled={switching}
+            title="Instantly log out every user — lead entry, sales, everyone"
+            className="w-full rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+          >
+            {switching ? "Switching…" : "🔁 Switch — log out everyone"}
+          </button>
+        </div>
+      )}
       <nav className="flex-1 space-y-0.5 px-3">
         {visibleNav.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

@@ -12,9 +12,14 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+  id                    String    @id @default(cuid())
+  name                  String
+  createdAt             DateTime  @default(now())
+  // Set to now() by the admin "Switch" (force logout everyone) button.
+  // Sessions are stateless JWTs with no server-side session list, so this
+  // is how a login issued before this timestamp gets treated as invalid —
+  // see getSession() in lib/auth.ts.
+  sessionsInvalidatedAt DateTime?
 
   users         User[]
   teams         Team[]
