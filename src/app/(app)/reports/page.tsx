@@ -79,7 +79,7 @@ export default async function ReportsPage() {
 
   const monthlyRevenue = (await getMonthlyRevenue(orgId)).map((m) => ({
     ...m,
-    projects: m.projects.map((p) => ({ ...p, wonAt: p.wonAt.toISOString() })),
+    projects: m.projects.map((p) => ({ ...p, closedAt: p.closedAt.toISOString() })),
   }));
 
   return (

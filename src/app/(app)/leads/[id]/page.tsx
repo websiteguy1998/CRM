@@ -9,6 +9,7 @@ import OwnerSelector from "@/components/owner-selector";
 import LeadActions from "@/components/lead-actions";
 import LeadDetailsEditor from "@/components/lead-details-editor";
 import SellerDealEditor from "@/components/seller-deal-editor";
+import SalesPanel from "@/components/sales-panel";
 import PendingCallSync from "@/components/pending-call-sync";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
@@ -47,6 +48,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         source: true,
         campaign: true,
         deals: true,
+        sales: { orderBy: { closedAt: "desc" } },
         calls: { orderBy: { startedAt: "desc" } },
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
         tasks: { orderBy: { dueAt: "asc" } },
@@ -182,6 +184,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               initialStatusNote={lead.statusNote}
               initialPrice={lead.price != null ? String(lead.price) : null}
               isWon={lead.stage.isWon}
+            />
+          )}
+
+          {!entryOnly && (
+            <SalesPanel
+              leadId={lead.id}
+              isWon={lead.stage.isWon}
+              sales={lead.sales.map((s) => ({
+                id: s.id,
+                type: s.type,
+                description: s.description,
+                amount: s.amount.toString(),
+                closedAt: s.closedAt.toISOString(),
+              }))}
             />
           )}
 

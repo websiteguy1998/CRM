@@ -9,7 +9,14 @@ export type MonthlyRevenueRow = {
   label: string;
   totalRevenue: number;
   wonCount: number;
-  projects: { leadId: string; clientName: string; price: number; wonAt: string }[];
+  projects: {
+    leadId: string;
+    clientName: string;
+    type: "INITIAL" | "UPSELL";
+    description: string | null;
+    amount: number;
+    closedAt: string;
+  }[];
 };
 
 /** The first month with any won projects, defaulting open so the panel isn't empty on load. */
@@ -53,8 +60,8 @@ export default function MonthlyRevenuePanel({ months }: { months: MonthlyRevenue
                   ) : (
                     <table className="w-full text-xs">
                       <tbody>
-                        {m.projects.map((p) => (
-                          <tr key={p.leadId} className="border-b border-slate-50 last:border-0">
+                        {m.projects.map((p, i) => (
+                          <tr key={`${p.leadId}-${i}`} className="border-b border-slate-50 last:border-0">
                             <td className="py-1.5">
                               <Link
                                 href={`/leads/${p.leadId}`}
@@ -62,10 +69,19 @@ export default function MonthlyRevenuePanel({ months }: { months: MonthlyRevenue
                               >
                                 {p.clientName || "Unnamed client"}
                               </Link>
+                              {p.type === "UPSELL" ? (
+                                <span className="ml-1.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                                  Upsell{p.description ? `: ${p.description}` : ""}
+                                </span>
+                              ) : (
+                                <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                                  Won
+                                </span>
+                              )}
                             </td>
-                            <td className="py-1.5 text-slate-400">{formatDateTime(p.wonAt)}</td>
+                            <td className="py-1.5 text-slate-400">{formatDateTime(p.closedAt)}</td>
                             <td className="py-1.5 text-right font-medium text-slate-800">
-                              {formatCurrency(p.price)}
+                              {formatCurrency(p.amount)}
                             </td>
                           </tr>
                         ))}

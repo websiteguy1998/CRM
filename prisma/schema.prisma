@@ -43,6 +43,7 @@ model Organization {
   tags          Tag[]
   integrations  IntegrationAccount[]
   templates     Template[]
+  sales         Sale[]
 }
 
 enum Role {
@@ -84,6 +85,7 @@ model User {
   activities      Activity[]
   stageChanges    LeadStageHistory[]
   sentMessages    Message[]
+  recordedSales   Sale[]
 }
 
 // Short-lived email verification code for the public signup flow. Not
@@ -273,6 +275,7 @@ model Lead {
   activities    Activity[]
   stageHistory  LeadStageHistory[]
   tags          LeadTag[]
+  sales         Sale[]
 
   @@index([organizationId, stageId])
   @@index([organizationId, ownerId])
@@ -291,6 +294,38 @@ model LeadStageHistory {
   changedById String?
   changedBy   User?          @relation(fields: [changedById], references: [id])
   changedAt   DateTime       @default(now())
+}
+
+enum SaleType {
+  INITIAL
+  UPSELL
+}
+
+// Every individual revenue event on a lead — the first payment when it's
+// won, plus any upsell closed afterward. Lead.price stays the running
+// total (sum of these, kept in sync by lib/sales.ts) so existing "won
+// value" displays (seller profile, dashboard leaderboard, Sellers list,
+// Reports top stats) don't need to change; this ledger exists so the
+// Monthly revenue report can attribute each sale to the actual calendar
+// month it happened in, and so upsells carry their own description.
+model Sale {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id])
+  type           SaleType
+  // Required for an upsell (what was upsold); null for the initial sale,
+  // which is just "the deal", not a separately-named line item.
+  description    String?
+  amount         Decimal      @db.Decimal(12, 2)
+  closedAt       DateTime     @default(now())
+  createdById    String?
+  createdBy      User?        @relation(fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, closedAt])
+  @@index([leadId])
 }
 
 model Tag {

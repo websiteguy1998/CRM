@@ -26,9 +26,10 @@ function monthLabel(key: string) {
  * the last `months` months (most recent first). "Assigned" counts a lead
  * in the month it was actually handed to them (via the LEAD_ASSIGNED
  * activity), not the month it was created — an older lead reassigned this
- * month should count this month. "Revenue" counts a lead's price in the
- * month its stage became a Won stage (LeadStageHistory), deduped per lead
- * per month so a reopen-then-rewin in the same month isn't double counted.
+ * month should count this month. "Won" counts initial sales (new projects
+ * closed) that month; "revenue" sums every sale that month — initial wins
+ * plus any upsells — each counted in the month it actually happened in,
+ * not backdated to when the lead was first won.
  */
 export async function getMonthlyPerformance(
   organizationId: string,
@@ -38,32 +39,31 @@ export async function getMonthlyPerformance(
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
 
-  const [assignedActivities, wonHistory] = await Promise.all([
+  const [assignedActivities, sales] = await Promise.all([
     prisma.activity.findMany({
       where: { organizationId, type: "LEAD_ASSIGNED", createdAt: { gte: start }, lead: { ownerId: sellerId } },
       select: { createdAt: true, leadId: true },
     }),
-    prisma.leadStageHistory.findMany({
-      where: { changedAt: { gte: start }, toStage: { isWon: true }, lead: { organizationId, ownerId: sellerId } },
-      select: { changedAt: true, leadId: true, lead: { select: { price: true } } },
+    prisma.sale.findMany({
+      where: { organizationId, closedAt: { gte: start }, lead: { ownerId: sellerId } },
+      select: { closedAt: true, amount: true, type: true },
     }),
   ]);
 
-  const buckets = new Map<string, { assignedLeadIds: Set<string>; wonLeadIds: Set<string>; revenue: number }>();
+  const buckets = new Map<string, { assignedLeadIds: Set<string>; won: number; revenue: number }>();
   for (let i = 0; i < months; i++) {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    buckets.set(monthKey(d), { assignedLeadIds: new Set(), wonLeadIds: new Set(), revenue: 0 });
+    buckets.set(monthKey(d), { assignedLeadIds: new Set(), won: 0, revenue: 0 });
   }
 
   for (const a of assignedActivities) {
     buckets.get(monthKey(a.createdAt))?.assignedLeadIds.add(a.leadId);
   }
-  for (const h of wonHistory) {
-    const bucket = buckets.get(monthKey(h.changedAt));
-    if (bucket && !bucket.wonLeadIds.has(h.leadId)) {
-      bucket.wonLeadIds.add(h.leadId);
-      bucket.revenue += h.lead.price != null ? Number(h.lead.price) : 0;
-    }
+  for (const s of sales) {
+    const bucket = buckets.get(monthKey(s.closedAt));
+    if (!bucket) continue;
+    bucket.revenue += Number(s.amount);
+    if (s.type === "INITIAL") bucket.won += 1;
   }
 
   return Array.from(buckets.entries())
@@ -72,16 +72,18 @@ export async function getMonthlyPerformance(
       month: key,
       label: monthLabel(key),
       leadsAssigned: b.assignedLeadIds.size,
-      won: b.wonLeadIds.size,
+      won: b.won,
       revenue: b.revenue,
     }));
 }
 
-export type WonProject = {
+export type SoldLine = {
   leadId: string;
   clientName: string;
-  price: number;
-  wonAt: Date;
+  type: "INITIAL" | "UPSELL";
+  description: string | null;
+  amount: number;
+  closedAt: Date;
 };
 
 export type MonthlyRevenue = {
@@ -89,49 +91,53 @@ export type MonthlyRevenue = {
   label: string;
   totalRevenue: number;
   wonCount: number;
-  projects: WonProject[];
+  projects: SoldLine[];
 };
 
 /**
- * Org-wide, month by month: every project (lead) that moved into a Won
- * stage that calendar month, with its value — the super admin's "what did
- * we actually close, start of month to end of month" view. One row per
- * calendar month for the last `months` months (most recent first), deduped
- * per lead per month so a reopen-then-rewin in the same month isn't
- * double counted (same rule as getMonthlyPerformance).
+ * Org-wide, month by month: every sale — an initial win or an upsell —
+ * that closed that calendar month, with its value. The super admin's
+ * "what did we actually close, start of month to end of month" view. An
+ * upsell counts toward the month it was actually closed in, not the month
+ * the lead was originally won, so growing an existing client's spend
+ * shows up as revenue when it happens.
  */
 export async function getMonthlyRevenue(organizationId: string, months = 12): Promise<MonthlyRevenue[]> {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
 
-  const wonHistory = await prisma.leadStageHistory.findMany({
-    where: { changedAt: { gte: start }, toStage: { isWon: true }, lead: { organizationId } },
+  const sales = await prisma.sale.findMany({
+    where: { organizationId, closedAt: { gte: start } },
     select: {
-      changedAt: true,
+      closedAt: true,
       leadId: true,
-      lead: { select: { price: true, contact: { select: { firstName: true, lastName: true } } } },
+      type: true,
+      description: true,
+      amount: true,
+      lead: { select: { contact: { select: { firstName: true, lastName: true } } } },
     },
-    orderBy: { changedAt: "desc" },
+    orderBy: { closedAt: "desc" },
   });
 
-  const buckets = new Map<string, { wonLeadIds: Set<string>; totalRevenue: number; projects: WonProject[] }>();
+  const buckets = new Map<string, { totalRevenue: number; wonCount: number; projects: SoldLine[] }>();
   for (let i = 0; i < months; i++) {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    buckets.set(monthKey(d), { wonLeadIds: new Set(), totalRevenue: 0, projects: [] });
+    buckets.set(monthKey(d), { totalRevenue: 0, wonCount: 0, projects: [] });
   }
 
-  for (const h of wonHistory) {
-    const key = monthKey(h.changedAt);
-    const bucket = buckets.get(key);
-    if (!bucket || bucket.wonLeadIds.has(h.leadId)) continue;
-    bucket.wonLeadIds.add(h.leadId);
-    const price = h.lead.price != null ? Number(h.lead.price) : 0;
-    bucket.totalRevenue += price;
+  for (const s of sales) {
+    const bucket = buckets.get(monthKey(s.closedAt));
+    if (!bucket) continue;
+    const amount = Number(s.amount);
+    bucket.totalRevenue += amount;
+    if (s.type === "INITIAL") bucket.wonCount += 1;
     bucket.projects.push({
-      leadId: h.leadId,
-      clientName: `${h.lead.contact.firstName} ${h.lead.contact.lastName ?? ""}`.trim(),
-      price,
-      wonAt: h.changedAt,
+      leadId: s.leadId,
+      clientName: `${s.lead.contact.firstName} ${s.lead.contact.lastName ?? ""}`.trim(),
+      type: s.type,
+      description: s.description,
+      amount,
+      closedAt: s.closedAt,
     });
   }
 
@@ -141,7 +147,7 @@ export async function getMonthlyRevenue(organizationId: string, months = 12): Pr
       month: key,
       label: monthLabel(key),
       totalRevenue: b.totalRevenue,
-      wonCount: b.projects.length,
+      wonCount: b.wonCount,
       projects: b.projects,
     }));
 }

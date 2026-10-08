@@ -5,6 +5,7 @@ import { requireApiSession } from "@/lib/api-auth";
 import { logActivity } from "@/lib/timeline";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
 import { findDuplicateLead, normalizeIdentifyingField, isValidEmailList } from "@/lib/duplicate-lead";
+import { recordInitialSale } from "@/lib/sales";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiSession();
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       company: true,
       stage: true,
       pipeline: { include: { stages: { orderBy: { order: "asc" } } } },
-      owner: true,
+      owner: { select: { id: true, name: true, email: true, role: true } },
       source: true,
       campaign: true,
       tags: { include: { tag: true } },
@@ -69,10 +70,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Only a Super Admin can allocate leads" }, { status: 403 });
   }
 
-  const { deliveryDate, idUrl, websiteUrl, clientName, phone, email, ...rest } = parsed.data;
+  const { deliveryDate, idUrl, websiteUrl, clientName, phone, email, price, ...rest } = parsed.data;
   const normalizedPhone = phone !== undefined ? normalizeIdentifyingField(phone) : undefined;
   const normalizedEmail = email !== undefined ? normalizeIdentifyingField(email) : undefined;
   const normalizedWebsiteUrl = websiteUrl !== undefined ? normalizeIdentifyingField(websiteUrl) : undefined;
+  // A price edit on a lead that's already Won is correcting what it
+  // actually closed for — route it through the Sale ledger (same as the
+  // win-moment flow) so it stays the source of truth lead.price is summed
+  // from. On a not-yet-won lead it's just a projected/estimated value with
+  // no sale behind it yet, so it's a plain field update.
+  const priceIsClosedDealEdit = price !== undefined && lead.status === "WON";
 
   if (phone !== undefined || email !== undefined || websiteUrl !== undefined) {
     const duplicate = await findDuplicateLead(orgId, {
@@ -99,15 +106,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
-  const updated = await prisma.lead.update({
+  await prisma.lead.update({
     where: { id },
     data: {
       ...rest,
       ...(idUrl !== undefined ? { idUrl: normalizeIdentifyingField(idUrl) ?? null } : {}),
       ...(websiteUrl !== undefined ? { websiteUrl: normalizedWebsiteUrl ?? null } : {}),
       ...(deliveryDate ? { deliveryDate: new Date(deliveryDate) } : {}),
+      ...(price !== undefined && !priceIsClosedDealEdit ? { price } : {}),
     },
-    include: { contact: true, owner: true },
+  });
+
+  if (priceIsClosedDealEdit) {
+    await recordInitialSale(prisma, { organizationId: orgId, leadId: id, amount: price, createdById: auth.session.sub });
+  }
+
+  const updated = await prisma.lead.findUniqueOrThrow({
+    where: { id },
+    include: {
+      contact: true,
+      // select, not include — owner is a User, and this lead goes straight
+      // into the browser's response body. The plain `owner: true` this
+      // replaced was shipping passwordHash to the client on every save.
+      owner: { select: { id: true, name: true, email: true, role: true } },
+    },
   });
 
   if (parsed.data.ownerId && parsed.data.ownerId !== lead.ownerId) {
@@ -171,6 +193,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
         await tx.deal.deleteMany({ where: { leadId: id } });
         await tx.note.deleteMany({ where: { leadId: id } });
         await tx.activity.deleteMany({ where: { leadId: id } });
+        await tx.sale.deleteMany({ where: { leadId: id } });
         await tx.lead.delete({ where: { id } });
 
         const otherLeads = await tx.lead.count({ where: { contactId: lead.contactId } });

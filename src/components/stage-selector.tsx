@@ -25,14 +25,25 @@ export default function StageSelector({
   // afterward. Nothing is saved until they confirm or skip.
   const [winStage, setWinStage] = useState<{ id: string; name: string } | null>(null);
   const [amount, setAmount] = useState("");
+  const [hasUpsell, setHasUpsell] = useState(false);
+  const [upsellDescription, setUpsellDescription] = useState("");
+  const [upsellAmount, setUpsellAmount] = useState("");
 
-  async function commit(stageId: string, price?: number) {
+  async function commit(
+    stageId: string,
+    price?: number,
+    upsell?: { description: string; amount: number }
+  ) {
     setLoading(true);
     try {
       await fetch(`/api/leads/${leadId}/stage`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(price !== undefined ? { stageId, price } : { stageId }),
+        body: JSON.stringify({
+          stageId,
+          ...(price !== undefined ? { price } : {}),
+          ...(upsell ? { upsellDescription: upsell.description, upsellAmount: upsell.amount } : {}),
+        }),
       });
       router.refresh();
     } finally {
@@ -44,6 +55,9 @@ export default function StageSelector({
     const stage = stages.find((s) => s.id === stageId);
     if (stage?.isWon) {
       setAmount(currentPrice != null ? String(currentPrice) : "");
+      setHasUpsell(false);
+      setUpsellDescription("");
+      setUpsellAmount("");
       setWinStage(stage);
       return;
     }
@@ -55,7 +69,13 @@ export default function StageSelector({
     e.preventDefault();
     if (!winStage) return;
     setValue(winStage.id);
-    commit(winStage.id, Number(amount));
+    commit(
+      winStage.id,
+      Number(amount),
+      hasUpsell && upsellDescription.trim() && upsellAmount
+        ? { description: upsellDescription.trim(), amount: Number(upsellAmount) }
+        : undefined
+    );
     setWinStage(null);
   }
 
@@ -113,6 +133,46 @@ export default function StageSelector({
             <p className="mt-2 text-xs text-slate-400">
               This is added straight to your total won sales.
             </p>
+
+            {hasUpsell ? (
+              <div className="mt-4 space-y-2 rounded-lg bg-indigo-50 p-3 text-left">
+                <p className="text-xs font-medium text-indigo-700">Upsell on this deal</p>
+                <input
+                  value={upsellDescription}
+                  onChange={(e) => setUpsellDescription(e.target.value)}
+                  placeholder="What was upsold? e.g. SEO package"
+                  className="input text-sm"
+                />
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-medium text-slate-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={upsellAmount}
+                    onChange={(e) => setUpsellAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="input text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHasUpsell(false)}
+                  className="text-xs text-slate-400 hover:underline"
+                >
+                  Remove upsell
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setHasUpsell(true)}
+                className="mt-3 text-xs font-medium text-indigo-600 hover:underline"
+              >
+                + Also closed an upsell on this?
+              </button>
+            )}
+
             <div className="mt-5 flex flex-col gap-2">
               <button type="submit" disabled={loading} className="btn-primary w-full">
                 {loading ? "Saving…" : "Save & mark won"}
