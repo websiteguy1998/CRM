@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
-import { setSessionCookie } from "@/lib/auth";
+import { getCrmWs, setSessionCookie } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
     role: user.role,
     name: user.name,
     email: user.email,
+    // Logs into whichever CRM's URL the sign-in form was on.
+    ws: await getCrmWs(),
   });
 
   return NextResponse.json({ ok: true });

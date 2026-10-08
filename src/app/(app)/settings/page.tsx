@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import PageHeader from "@/components/page-header";
 
 const SECTIONS = [

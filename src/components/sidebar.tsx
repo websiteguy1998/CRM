@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link, useCrmPath, useCrmPrefix } from "@/components/crm-context";
 import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/auth";
 import { canAccess, isAdmin } from "@/lib/access";
@@ -21,48 +21,44 @@ const NAV = [
 ];
 
 export default function Sidebar({ session }: { session: SessionPayload }) {
-  const pathname = usePathname();
+  const crmPath = useCrmPath();
+  const prefix = useCrmPrefix();
+  const rawPathname = usePathname();
+  const pathname = prefix && rawPathname.startsWith(prefix) ? rawPathname.slice(prefix.length) || "/" : rawPathname;
   const router = useRouter();
   const visibleNav = NAV.filter((item) => canAccess(session.role, item.href));
   const [switching, setSwitching] = useState(false);
-  // Users never live in CRM B, so a session whose data org differs from
-  // its home org means the admin Switch has everyone in CRM B right now.
-  const inCrmB = session.orgId !== session.homeOrgId;
+  const inCrmA = session.ws === "a";
 
-  // Follow an admin Switch even on a page that's just sitting open — the
-  // next request would pick it up anyway, this just doesn't wait for one.
+  // Follow an admin Switch even on a CRM A page that's just sitting open:
+  // once this login stops working, reload and let the app layout move
+  // them to CRM B (or the login page).
   useEffect(() => {
+    if (!inCrmA) return;
     const timer = setInterval(async () => {
       const res = await fetch("/api/workspace").catch(() => null);
-      if (!res?.ok) return;
-      const { orgId } = (await res.json()) as { orgId: string };
-      if (orgId !== session.orgId) window.location.reload();
+      if (res?.status === 401) window.location.href = "/";
     }, 20_000);
     return () => clearInterval(timer);
-  }, [session.orgId]);
+  }, [inCrmA]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push(crmPath("/login"));
     router.refresh();
   }
 
-  async function switchCrm() {
-    const target = inCrmB ? "A" : "B";
+  async function switchToCrmB() {
     if (
       !confirm(
-        `This moves every user — every lead entry agent, every sales agent, and you — to CRM ${target} right now. Everyone stays logged in. Continue?`
+        "This moves every user — every lead entry agent, every sales agent, and you — to CRM B right now. Everyone is logged out of CRM A; to get back into CRM A you'll have to sign in at its URL. Continue?"
       )
     ) {
       return;
     }
     setSwitching(true);
     try {
-      await fetch("/api/workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target }),
-      });
+      await fetch("/api/workspace", { method: "POST" });
     } finally {
       window.location.href = "/";
     }
@@ -75,23 +71,16 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
           U
         </div>
         <span className="text-sm font-semibold text-slate-900">Unify CRM</span>
-        <span
-          className={`ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-            inCrmB ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {inCrmB ? "CRM B" : "CRM A"}
-        </span>
       </div>
-      {isAdmin(session.role) && (
+      {inCrmA && isAdmin(session.role) && (
         <div className="px-3 pb-3">
           <button
-            onClick={switchCrm}
+            onClick={switchToCrmB}
             disabled={switching}
-            title="Move every user — lead entry, sales, everyone — to the other CRM"
+            title="Move every user — lead entry, sales, everyone — to CRM B"
             className="w-full rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
           >
-            {switching ? "Switching…" : inCrmB ? "🔁 Switch back to CRM A" : "🔁 Switch to CRM B"}
+            {switching ? "Switching…" : "🔁 Switch to CRM B"}
           </button>
         </div>
       )}

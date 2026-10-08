@@ -4,7 +4,7 @@ import PageHeader from "@/components/page-header";
 import { formatCurrency, relativeTime, localStartOfToday } from "@/lib/format";
 import { hasFullLeadVisibility, isAdmin, leadWhereForSession } from "@/lib/access";
 import { getViewerTzOffset } from "@/lib/timezone";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 
 export default async function DashboardPage() {
   const session = await getSession();

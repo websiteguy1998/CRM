@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { getCrmWs } from "@/lib/auth";
+import { crmPrefix } from "@/lib/crm";
+import { CrmProvider } from "@/components/crm-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,13 +20,16 @@ export const metadata: Metadata = {
   description: "Unified sales CRM — leads, WhatsApp, calls and email in one timeline.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const prefix = crmPrefix(await getCrmWs());
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">{children}</body>
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
+        <CrmProvider prefix={prefix}>{children}</CrmProvider>
+      </body>
     </html>
   );
 }

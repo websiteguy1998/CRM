@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useCrmPath } from "@/components/crm-context";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const crmPath = useCrmPath();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function LoginForm() {
         setError(data.error ?? "Unable to sign in");
         return;
       }
-      router.push(searchParams.get("next") ?? "/");
+      router.push(crmPath(searchParams.get("next") ?? "/"));
       router.refresh();
     } finally {
       setLoading(false);
@@ -70,7 +72,7 @@ export default function LoginForm() {
       </button>
       <p className="text-center text-xs text-slate-400">
         New here?{" "}
-        <a href="/signup" className="text-indigo-600 hover:underline">
+        <a href={crmPath("/signup")} className="text-indigo-600 hover:underline">
           Create an account
         </a>
       </p>

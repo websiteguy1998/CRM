@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import PageHeader from "@/components/page-header";
 import StageBadge from "@/components/stage-badge";
 import DeleteRecordingButton from "@/components/delete-recording-button";

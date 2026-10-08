@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
 
 type WebsiteDuplicate = { id: string; clientName: string };

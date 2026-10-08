@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";

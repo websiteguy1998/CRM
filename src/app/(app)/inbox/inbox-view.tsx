@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import { channelIcon, formatDateTime, relativeTime } from "@/lib/format";
 
 type ConversationSummary = {

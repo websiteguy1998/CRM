@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import DeleteRecordingButton from "@/components/delete-recording-button";
 import { formatDateTime } from "@/lib/format";
 

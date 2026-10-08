@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/crm-context";
 import { useRouter } from "next/navigation";
 import ScoreBadge from "@/components/score-badge";
 import { formatCurrency } from "@/lib/format";

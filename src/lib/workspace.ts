@@ -2,31 +2,26 @@ import { prisma } from "@/lib/prisma";
 import { getPrimaryOrganizationId } from "@/lib/org";
 
 /**
- * Two CRMs in one app:
- *  - CRM A — the primary org. Every user account and integration lives
- *    here, and every inbound lead (webhooks, email, Zoom) always lands here.
- *  - CRM B — a second, empty org whose leads are entered by hand.
+ * Two CRMs in one app, on two URLs (see lib/crm.ts):
+ *  - CRM A — the primary org, at the site root. Every user account and
+ *    integration lives here, and every inbound lead (webhooks, email, Zoom)
+ *    always lands here.
+ *  - CRM B — a second, empty org at /crm-b whose leads are entered by hand.
+ *    Same user accounts, but its own login cookie.
  *
- * The admin "Switch" button flips Organization.activeWorkspaceId on CRM A,
- * and getSession() points every logged-in user's data queries at whichever
- * CRM is active — nobody has to log in again.
+ * The admin "Switch" button in CRM A logs everyone out of CRM A and hands
+ * each of them a CRM B login on their next page load (see
+ * /api/auth/handoff). CRM A is then only reachable by signing in at its URL.
  */
 export const CRM_B_NAME = "CRM B";
 
-export async function getActiveWorkspaceId() {
-  const primaryId = await getPrimaryOrganizationId();
-  const primary = await prisma.organization.findUnique({
-    where: { id: primaryId },
-    select: { activeWorkspaceId: true },
-  });
-  return primary?.activeWorkspaceId ?? primaryId;
-}
 
 /**
- * CRM B is created on the first switch: a fresh org with a copy of CRM A's
- * default pipeline stages (so leads have somewhere to go) and nothing else.
+ * CRM B's org id. It's created the first time anyone needs it: a fresh org
+ * with a copy of CRM A's default pipeline stages (so leads have somewhere
+ * to go) and nothing else.
  */
-async function getOrCreateCrmB(primaryId: string) {
+export async function getCrmBOrgId(primaryId: string) {
   const existing = await prisma.organization.findFirst({
     where: { id: { not: primaryId } },
     orderBy: { createdAt: "asc" },
@@ -59,13 +54,16 @@ async function getOrCreateCrmB(primaryId: string) {
   });
 }
 
-/** Moves everyone to CRM B, or back to CRM A. Returns the now-active org id. */
-export async function switchWorkspace(target: "A" | "B") {
+/**
+ * The Switch: every CRM A login issued before now stops working in CRM A,
+ * and activeWorkspaceId marks that those logins should be handed over to
+ * CRM B instead of sent to the CRM A login page.
+ */
+export async function switchEveryoneToCrmB() {
   const primaryId = await getPrimaryOrganizationId();
-  const activeId = target === "B" ? await getOrCreateCrmB(primaryId) : primaryId;
+  const crmBId = await getCrmBOrgId(primaryId);
   await prisma.organization.update({
     where: { id: primaryId },
-    data: { activeWorkspaceId: target === "B" ? activeId : null },
+    data: { activeWorkspaceId: crmBId, sessionsInvalidatedAt: new Date() },
   });
-  return activeId;
 }
