@@ -32,7 +32,7 @@ async function getSessionRole(req: NextRequest, ws: CrmWs): Promise<Role | null>
 }
 
 /**
- * CRM B is the same app served under /crm-b (see lib/crm.ts): strip the
+ * CRM B is the same app served under CRM_B_PREFIX (see lib/crm.ts): strip the
  * prefix, route to the normal page/API, and tag the request so the server
  * knows which CRM — and which login cookie — it's serving.
  */

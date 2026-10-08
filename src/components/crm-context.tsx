@@ -6,8 +6,8 @@ import { withCrmPrefix } from "@/lib/crm";
 
 /**
  * Keeps CRM B's pages on CRM B's URL. The app is written with root paths
- * ("/leads", "/api/leads"), so inside CRM B (/crm-b) every link, router
- * push and same-origin fetch gets the /crm-b prefix added here.
+ * ("/leads", "/api/leads"), so inside CRM B (CRM_B_PREFIX) every link, router
+ * push and same-origin fetch gets the CRM_B_PREFIX prefix added here.
  */
 const CrmPrefixContext = createContext("");
 
@@ -31,7 +31,7 @@ export function CrmProvider({ prefix, children }: { prefix: string; children: Re
   return <CrmPrefixContext.Provider value={prefix}>{children}</CrmPrefixContext.Provider>;
 }
 
-/** Prefixes an app path for the current CRM: "/leads" -> "/crm-b/leads" in CRM B. */
+/** Prefixes an app path for the current CRM: "/leads" -> "CRM_B_PREFIX/leads" in CRM B. */
 export function useCrmPath() {
   const prefix = useContext(CrmPrefixContext);
   return (path: string) => withCrmPrefix(prefix, path);

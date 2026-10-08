@@ -4,7 +4,7 @@ import { clearSessionCookie, getCrmWs, getSwitchedCrmALogin, setSessionCookie } 
 import { CRM_B_PREFIX } from "@/lib/crm";
 
 /**
- * Where the admin Switch sends everyone (as /crm-b/api/auth/handoff): turns
+ * Where the admin Switch sends everyone (as CRM_B_PREFIX/api/auth/handoff): turns
  * the CRM A login it just ended into a CRM B login, and drops the CRM A
  * cookie so CRM A's URL shows its own login page from then on.
  */

@@ -6,7 +6,7 @@ import { getPrimaryOrganizationId } from "@/lib/org";
  *  - CRM A — the primary org, at the site root. Every user account and
  *    integration lives here, and every inbound lead (webhooks, email, Zoom)
  *    always lands here.
- *  - CRM B — a second, empty org at /crm-b whose leads are entered by hand.
+ *  - CRM B — a second, empty org at CRM_B_PREFIX whose leads are entered by hand.
  *    Same user accounts, but its own login cookie.
  *
  * The admin "Switch" button in CRM A logs everyone out of CRM A and hands

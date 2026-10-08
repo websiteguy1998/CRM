@@ -32,7 +32,7 @@ export type SessionPayload = {
 // getSession() turns it into homeOrgId + the CRM's own orgId.
 export type TokenPayload = Omit<SessionPayload, "homeOrgId">;
 
-/** Which CRM this request is for — proxy.ts tags every /crm-b request. */
+/** Which CRM this request is for — proxy.ts tags every CRM_B_PREFIX request. */
 export async function getCrmWs(): Promise<CrmWs> {
   return (await headers()).get(CRM_HEADER) === "b" ? "b" : "a";
 }
