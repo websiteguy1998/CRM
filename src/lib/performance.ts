@@ -77,6 +77,75 @@ export async function getMonthlyPerformance(
     }));
 }
 
+export type WonProject = {
+  leadId: string;
+  clientName: string;
+  price: number;
+  wonAt: Date;
+};
+
+export type MonthlyRevenue = {
+  month: string;
+  label: string;
+  totalRevenue: number;
+  wonCount: number;
+  projects: WonProject[];
+};
+
+/**
+ * Org-wide, month by month: every project (lead) that moved into a Won
+ * stage that calendar month, with its value — the super admin's "what did
+ * we actually close, start of month to end of month" view. One row per
+ * calendar month for the last `months` months (most recent first), deduped
+ * per lead per month so a reopen-then-rewin in the same month isn't
+ * double counted (same rule as getMonthlyPerformance).
+ */
+export async function getMonthlyRevenue(organizationId: string, months = 12): Promise<MonthlyRevenue[]> {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+
+  const wonHistory = await prisma.leadStageHistory.findMany({
+    where: { changedAt: { gte: start }, toStage: { isWon: true }, lead: { organizationId } },
+    select: {
+      changedAt: true,
+      leadId: true,
+      lead: { select: { price: true, contact: { select: { firstName: true, lastName: true } } } },
+    },
+    orderBy: { changedAt: "desc" },
+  });
+
+  const buckets = new Map<string, { wonLeadIds: Set<string>; totalRevenue: number; projects: WonProject[] }>();
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    buckets.set(monthKey(d), { wonLeadIds: new Set(), totalRevenue: 0, projects: [] });
+  }
+
+  for (const h of wonHistory) {
+    const key = monthKey(h.changedAt);
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.wonLeadIds.has(h.leadId)) continue;
+    bucket.wonLeadIds.add(h.leadId);
+    const price = h.lead.price != null ? Number(h.lead.price) : 0;
+    bucket.totalRevenue += price;
+    bucket.projects.push({
+      leadId: h.leadId,
+      clientName: `${h.lead.contact.firstName} ${h.lead.contact.lastName ?? ""}`.trim(),
+      price,
+      wonAt: h.changedAt,
+    });
+  }
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, b]) => ({
+      month: key,
+      label: monthLabel(key),
+      totalRevenue: b.totalRevenue,
+      wonCount: b.projects.length,
+      projects: b.projects,
+    }));
+}
+
 export type MonthlyLeadEntry = { month: string; label: string; leadsAdded: number };
 
 /**

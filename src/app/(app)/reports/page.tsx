@@ -2,7 +2,9 @@ import { Link } from "@/components/crm-context";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/page-header";
+import MonthlyRevenuePanel from "@/components/monthly-revenue-panel";
 import { formatCurrency } from "@/lib/format";
+import { getMonthlyRevenue } from "@/lib/performance";
 
 export default async function ReportsPage() {
   const session = await getSession();
@@ -75,6 +77,11 @@ export default async function ReportsPage() {
     return { name: a.name, leads: a.ownedLeads.length, calls: a.calls.length, deals, revenue, rate };
   });
 
+  const monthlyRevenue = (await getMonthlyRevenue(orgId)).map((m) => ({
+    ...m,
+    projects: m.projects.map((p) => ({ ...p, wonAt: p.wonAt.toISOString() })),
+  }));
+
   return (
     <div>
       <PageHeader
@@ -100,6 +107,8 @@ export default async function ReportsPage() {
             </div>
           ))}
         </div>
+
+        <MonthlyRevenuePanel months={monthlyRevenue} />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="card p-5">
