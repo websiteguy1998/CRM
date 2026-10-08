@@ -32,14 +32,22 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
 
   // Follow an admin Switch even on a CRM A page that's just sitting open:
   // once this login stops working, reload and let the app layout move
-  // them to CRM B (or the login page).
+  // them to CRM B (or the login page). Short interval so it reads as
+  // "instant" instead of something people have to manually refresh for —
+  // this is one cheap GET (signed-cookie check + a single indexed row
+  // lookup) every couple seconds, only while they're actually on CRM A.
   useEffect(() => {
     if (!inCrmA) return;
-    const timer = setInterval(async () => {
+    let cancelled = false;
+    async function check() {
       const res = await fetch("/api/workspace").catch(() => null);
-      if (res?.status === 401) window.location.href = "/";
-    }, 20_000);
-    return () => clearInterval(timer);
+      if (!cancelled && res?.status === 401) window.location.href = "/";
+    }
+    const timer = setInterval(check, 2_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [inCrmA]);
 
   async function logout() {
