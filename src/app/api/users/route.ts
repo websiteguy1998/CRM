@@ -9,7 +9,7 @@ export async function GET() {
   if ("error" in auth) return auth.error;
 
   const users = await prisma.user.findMany({
-    where: { organizationId: auth.session.orgId },
+    where: { organizationId: auth.session.homeOrgId },
     select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.create({
     data: {
-      organizationId: auth.session.orgId,
+      organizationId: auth.session.homeOrgId,
       name: data.name,
       email: data.email.toLowerCase(),
       passwordHash: await hashPassword(data.password),

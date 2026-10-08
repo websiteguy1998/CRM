@@ -30,17 +30,21 @@ function monthLabel(key: string) {
  * month its stage became a Won stage (LeadStageHistory), deduped per lead
  * per month so a reopen-then-rewin in the same month isn't double counted.
  */
-export async function getMonthlyPerformance(sellerId: string, months = 12): Promise<MonthlyPerformance[]> {
+export async function getMonthlyPerformance(
+  organizationId: string,
+  sellerId: string,
+  months = 12
+): Promise<MonthlyPerformance[]> {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
 
   const [assignedActivities, wonHistory] = await Promise.all([
     prisma.activity.findMany({
-      where: { type: "LEAD_ASSIGNED", createdAt: { gte: start }, lead: { ownerId: sellerId } },
+      where: { organizationId, type: "LEAD_ASSIGNED", createdAt: { gte: start }, lead: { ownerId: sellerId } },
       select: { createdAt: true, leadId: true },
     }),
     prisma.leadStageHistory.findMany({
-      where: { changedAt: { gte: start }, toStage: { isWon: true }, lead: { ownerId: sellerId } },
+      where: { changedAt: { gte: start }, toStage: { isWon: true }, lead: { organizationId, ownerId: sellerId } },
       select: { changedAt: true, leadId: true, lead: { select: { price: true } } },
     }),
   ]);
@@ -81,12 +85,16 @@ export type MonthlyLeadEntry = { month: string; label: string; leadsAdded: numbe
  * counted by when the lead was created, since that's the only thing this
  * role actually does.
  */
-export async function getMonthlyLeadEntry(userId: string, months = 12): Promise<MonthlyLeadEntry[]> {
+export async function getMonthlyLeadEntry(
+  organizationId: string,
+  userId: string,
+  months = 12
+): Promise<MonthlyLeadEntry[]> {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
 
   const leads = await prisma.lead.findMany({
-    where: { createdById: userId, createdAt: { gte: start } },
+    where: { organizationId, createdById: userId, createdAt: { gte: start } },
     select: { createdAt: true },
   });
 

@@ -7,7 +7,7 @@ export async function POST() {
   if ("error" in auth) return auth.error;
 
   try {
-    const result = await checkGmailInbox(auth.session.orgId);
+    const result = await checkGmailInbox(auth.session.homeOrgId);
     return NextResponse.json(result);
   } catch (err) {
     console.error("Gmail inbox check failed", err);

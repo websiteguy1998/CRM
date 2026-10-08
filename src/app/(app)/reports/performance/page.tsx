@@ -29,7 +29,7 @@ export default async function PerformancePage() {
 
   const [sellers, leads, calls] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: orgId, role: { in: ["AGENT", "MANAGER"] } },
+      where: { organizationId: session.homeOrgId, role: { in: ["AGENT", "MANAGER"] } },
       orderBy: { name: "asc" },
     }),
     prisma.lead.findMany({

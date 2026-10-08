@@ -15,7 +15,7 @@ export async function POST(_req: NextRequest) {
   if ("error" in auth) return auth.error;
 
   try {
-    const result = await syncZoomCallHistory(auth.session.orgId, 1, "[zoom recent-sync]");
+    const result = await syncZoomCallHistory(auth.session.homeOrgId, 1, "[zoom recent-sync]");
     return NextResponse.json(result);
   } catch {
     // Not connected, or Zoom's API hiccuped — silently no-op, this runs

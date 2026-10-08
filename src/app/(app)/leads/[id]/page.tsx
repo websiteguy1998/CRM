@@ -53,7 +53,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         activities: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },
     }),
-    prisma.user.findMany({ where: { organizationId: session.orgId, active: true } }),
+    prisma.user.findMany({ where: { organizationId: session.homeOrgId, active: true } }),
     prisma.user.findUnique({ where: { id: session.sub }, select: { zoomUserEmail: true } }),
   ]);
 

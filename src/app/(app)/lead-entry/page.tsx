@@ -22,7 +22,7 @@ export default async function LeadEntryPage() {
   if (!isAdmin(session.role)) return null;
 
   const users = await prisma.user.findMany({
-    where: { organizationId: session.orgId, role: "LEAD_ENTRY" },
+    where: { organizationId: session.homeOrgId, role: "LEAD_ENTRY" },
     orderBy: { name: "asc" },
   });
 

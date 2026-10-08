@@ -15,7 +15,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
 
   const seller = await prisma.user.findFirst({
-    where: { id, organizationId: session.orgId, role: { in: ["AGENT", "MANAGER"] } },
+    where: { id, organizationId: session.homeOrgId, role: { in: ["AGENT", "MANAGER"] } },
   });
   if (!seller) notFound();
   const today = localStartOfToday(await getViewerTzOffset());
@@ -40,7 +40,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
       },
       select: { leadId: true },
     }),
-    getMonthlyPerformance(seller.id),
+    getMonthlyPerformance(session.orgId, seller.id),
   ]);
 
   const todayLeadCount = new Set(assignedToday.map((a) => a.leadId)).size;

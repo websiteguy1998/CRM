@@ -161,12 +161,12 @@ export default async function LeadsPage({
       orderBy: { order: "asc" },
     }),
     prisma.user.findMany({
-      where: { organizationId: session.orgId, active: true },
+      where: { organizationId: session.homeOrgId, active: true },
       select: { id: true, name: true, role: true },
     }),
     admin
       ? prisma.user.findMany({
-          where: { organizationId: session.orgId, active: true, role: { in: ["ADMIN", "LEAD_ENTRY"] } },
+          where: { organizationId: session.homeOrgId, active: true, role: { in: ["ADMIN", "LEAD_ENTRY"] } },
         })
       : Promise.resolve([]),
     prisma.lead.findMany({

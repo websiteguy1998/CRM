@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cal
     return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
   }
 
-  const info = await getCallRecordingDownloadInfo(auth.session.orgId, {
+  const info = await getCallRecordingDownloadInfo(auth.session.homeOrgId, {
     callId: call.externalId,
     logId: call.recordingLogId,
   });

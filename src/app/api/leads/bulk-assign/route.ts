@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { leadIds, ownerId } = parsed.data;
 
-  const owner = await prisma.user.findFirst({ where: { id: ownerId, organizationId: orgId } });
+  const owner = await prisma.user.findFirst({ where: { id: ownerId, organizationId: auth.session.homeOrgId } });
   if (!owner) return NextResponse.json({ error: "Seller not found" }, { status: 400 });
 
   const leads = await prisma.lead.findMany({

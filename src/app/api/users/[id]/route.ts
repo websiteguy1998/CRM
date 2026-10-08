@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const { id } = await params;
 
-  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.orgId } });
+  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.homeOrgId } });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
@@ -69,12 +69,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "You can't delete your own account" }, { status: 400 });
   }
 
-  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.orgId } });
+  const user = await prisma.user.findFirst({ where: { id, organizationId: auth.session.homeOrgId } });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (user.role === "ADMIN") {
     const otherActiveAdmins = await prisma.user.count({
-      where: { organizationId: auth.session.orgId, role: "ADMIN", active: true, id: { not: id } },
+      where: { organizationId: auth.session.homeOrgId, role: "ADMIN", active: true, id: { not: id } },
     });
     if (otherActiveAdmins === 0) {
       return NextResponse.json({ error: "Can't delete the last active admin" }, { status: 400 });

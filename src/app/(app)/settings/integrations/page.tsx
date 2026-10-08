@@ -37,7 +37,7 @@ export default async function IntegrationsSettingsPage() {
   if (!session) return null;
 
   const integrations = await prisma.integrationAccount.findMany({
-    where: { organizationId: session.orgId },
+    where: { organizationId: session.homeOrgId },
     orderBy: { createdAt: "asc" },
   });
 

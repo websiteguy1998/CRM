@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    await clickToCall(orgId, user.zoomUserEmail, lead.contact.phone);
+    await clickToCall(auth.session.homeOrgId, user.zoomUserEmail, lead.contact.phone);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Call failed" }, { status: 502 });
   }

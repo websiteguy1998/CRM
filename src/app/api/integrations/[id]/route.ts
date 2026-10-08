@@ -11,7 +11,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   const account = await prisma.integrationAccount.findFirst({
-    where: { id, organizationId: auth.session.orgId },
+    where: { id, organizationId: auth.session.homeOrgId },
   });
   if (!account) return NextResponse.json({ error: "Not found" }, { status: 404 });
 

@@ -21,7 +21,7 @@ export default async function SellersPage() {
 
   const [sellers, ownedLeads, assignedToday] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: session.orgId, role: { in: ["AGENT", "MANAGER"] } },
+      where: { organizationId: session.homeOrgId, role: { in: ["AGENT", "MANAGER"] } },
       orderBy: { name: "asc" },
     }),
     prisma.lead.findMany({

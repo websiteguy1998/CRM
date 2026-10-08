@@ -35,7 +35,7 @@ export default async function MyPerformancePage() {
       },
       select: { leadId: true },
     }),
-    getMonthlyPerformance(session.sub),
+    getMonthlyPerformance(session.orgId, session.sub),
   ]);
 
   const todayLeadCount = new Set(assignedToday.map((a) => a.leadId)).size;

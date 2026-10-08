@@ -96,16 +96,16 @@ export default async function DashboardPage() {
     }),
     fullAccess
       ? prisma.user.findMany({
-          where: { organizationId: orgId, role: { in: ["AGENT", "MANAGER"] }, active: true },
+          where: { organizationId: session.homeOrgId, role: { in: ["AGENT", "MANAGER"] }, active: true },
           include: {
-            ownedLeads: { select: { id: true, status: true } },
-            calls: { select: { id: true } },
-            _count: { select: { ownedLeads: true } },
+            ownedLeads: { where: { organizationId: orgId }, select: { id: true, status: true } },
+            calls: { where: { organizationId: orgId }, select: { id: true } },
+            _count: { select: { ownedLeads: { where: { organizationId: orgId } } } },
           },
         })
       : Promise.resolve([]),
     isAdmin(session.role)
-      ? prisma.user.count({ where: { organizationId: orgId, active: false } })
+      ? prisma.user.count({ where: { organizationId: session.homeOrgId, active: false } })
       : Promise.resolve(0),
   ]);
 

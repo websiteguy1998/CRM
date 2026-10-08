@@ -16,7 +16,7 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
   const { id } = await params;
 
   const user = await prisma.user.findFirst({
-    where: { id, organizationId: session.orgId, role: "LEAD_ENTRY" },
+    where: { id, organizationId: session.homeOrgId, role: "LEAD_ENTRY" },
   });
   if (!user) notFound();
 
@@ -26,7 +26,7 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
       include: { contact: true, owner: true },
       orderBy: { createdAt: "desc" },
     }),
-    getMonthlyLeadEntry(user.id),
+    getMonthlyLeadEntry(session.orgId, user.id),
   ]);
 
   const tzOffsetMinutes = await getViewerTzOffset();

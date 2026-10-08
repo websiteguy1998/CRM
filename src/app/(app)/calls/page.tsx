@@ -79,7 +79,7 @@ export default async function CallsPage({
       take: 200,
     }),
     fullVisibility
-      ? prisma.user.findMany({ where: { organizationId: session.orgId, active: true, calls: { some: {} } } })
+      ? prisma.user.findMany({ where: { organizationId: session.homeOrgId, active: true, calls: { some: { organizationId: session.orgId } } } })
       : Promise.resolve([]),
   ]);
 

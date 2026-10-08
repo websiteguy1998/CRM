@@ -8,7 +8,7 @@ export async function GET() {
   if ("error" in auth) return auth.error;
 
   const integrations = await prisma.integrationAccount.findMany({
-    where: { organizationId: auth.session.orgId },
+    where: { organizationId: auth.session.homeOrgId },
     orderBy: { type: "asc" },
   });
 
@@ -35,14 +35,14 @@ export async function POST(req: NextRequest) {
   const integration = await prisma.integrationAccount.upsert({
     where: {
       organizationId_type_name: {
-        organizationId: auth.session.orgId,
+        organizationId: auth.session.homeOrgId,
         type: data.type,
         name: data.name,
       },
     },
     update: { config: data.config, status: "CONNECTED" },
     create: {
-      organizationId: auth.session.orgId,
+      organizationId: auth.session.homeOrgId,
       type: data.type,
       name: data.name,
       config: data.config,

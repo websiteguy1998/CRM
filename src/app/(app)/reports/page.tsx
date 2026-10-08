@@ -21,10 +21,10 @@ export default async function ReportsPage() {
       _count: { _all: true },
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: { in: ["AGENT", "MANAGER"] } },
+      where: { organizationId: session.homeOrgId, role: { in: ["AGENT", "MANAGER"] } },
       include: {
-        ownedLeads: { select: { id: true, status: true } },
-        calls: { select: { id: true, status: true } },
+        ownedLeads: { where: { organizationId: orgId }, select: { id: true, status: true } },
+        calls: { where: { organizationId: orgId }, select: { id: true, status: true } },
       },
     }),
     // Revenue tracks Lead.price (what a seller enters as the closed

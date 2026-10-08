@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const days = Math.min(Math.max(Number(body.days) || 30, 1), 180);
 
   try {
-    const result = await syncZoomCallHistory(auth.session.orgId, days, "[zoom backfill]");
+    const result = await syncZoomCallHistory(auth.session.homeOrgId, days, "[zoom backfill]");
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Import failed" }, { status: 502 });

@@ -13,9 +13,9 @@ export default async function UsersSettingsPage() {
   if (!session) return null;
 
   const users = await prisma.user.findMany({
-    where: { organizationId: session.orgId },
+    where: { organizationId: session.homeOrgId },
     orderBy: { createdAt: "asc" },
-    include: { _count: { select: { calls: true } } },
+    include: { _count: { select: { calls: { where: { organizationId: session.orgId } } } } },
   });
   const pending = users.filter((u) => !u.active);
   const active = users.filter((u) => u.active);

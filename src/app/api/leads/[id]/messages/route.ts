@@ -55,10 +55,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const dispatch =
     channel === "WHATSAPP"
-      ? sendWhatsAppMessage(orgId, destination, body)
+      ? sendWhatsAppMessage(auth.session.homeOrgId, destination, body)
       : channel === "SMS"
-      ? sendSms(orgId, destination, body)
-      : sendEmail(orgId, destination, subject ?? "", body);
+      ? sendSms(auth.session.homeOrgId, destination, body)
+      : sendEmail(auth.session.homeOrgId, destination, subject ?? "", body);
   const result = await dispatch;
 
   const message = await prisma.message.create({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/auth";
@@ -25,6 +25,21 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
   const router = useRouter();
   const visibleNav = NAV.filter((item) => canAccess(session.role, item.href));
   const [switching, setSwitching] = useState(false);
+  // Users never live in CRM B, so a session whose data org differs from
+  // its home org means the admin Switch has everyone in CRM B right now.
+  const inCrmB = session.orgId !== session.homeOrgId;
+
+  // Follow an admin Switch even on a page that's just sitting open — the
+  // next request would pick it up anyway, this just doesn't wait for one.
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      const res = await fetch("/api/workspace").catch(() => null);
+      if (!res?.ok) return;
+      const { orgId } = (await res.json()) as { orgId: string };
+      if (orgId !== session.orgId) window.location.reload();
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [session.orgId]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -32,19 +47,24 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
     router.refresh();
   }
 
-  async function forceLogoutAll() {
+  async function switchCrm() {
+    const target = inCrmB ? "A" : "B";
     if (
       !confirm(
-        "This logs out every user right now — every lead entry agent, every sales agent, and you too. Everyone will have to sign in again. Continue?"
+        `This moves every user — every lead entry agent, every sales agent, and you — to CRM ${target} right now. Everyone stays logged in. Continue?`
       )
     ) {
       return;
     }
     setSwitching(true);
     try {
-      await fetch("/api/auth/force-logout-all", { method: "POST" });
+      await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+      });
     } finally {
-      window.location.href = "/login";
+      window.location.href = "/";
     }
   }
 
@@ -55,16 +75,23 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
           U
         </div>
         <span className="text-sm font-semibold text-slate-900">Unify CRM</span>
+        <span
+          className={`ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+            inCrmB ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"
+          }`}
+        >
+          {inCrmB ? "CRM B" : "CRM A"}
+        </span>
       </div>
       {isAdmin(session.role) && (
         <div className="px-3 pb-3">
           <button
-            onClick={forceLogoutAll}
+            onClick={switchCrm}
             disabled={switching}
-            title="Instantly log out every user — lead entry, sales, everyone"
+            title="Move every user — lead entry, sales, everyone — to the other CRM"
             className="w-full rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
           >
-            {switching ? "Switching…" : "🔁 Switch — log out everyone"}
+            {switching ? "Switching…" : inCrmB ? "🔁 Switch back to CRM A" : "🔁 Switch to CRM B"}
           </button>
         </div>
       )}

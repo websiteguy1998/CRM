@@ -20,6 +20,11 @@ model Organization {
   // is how a login issued before this timestamp gets treated as invalid —
   // see getSession() in lib/auth.ts.
   sessionsInvalidatedAt DateTime?
+  // Only meaningful on the primary org (CRM A). Set by the admin "Switch"
+  // button to the org every user is currently working in — null means
+  // CRM A itself. Logins and users always live in CRM A; this only picks
+  // whose leads/calls/tasks everyone sees. See getSession() in lib/auth.ts.
+  activeWorkspaceId     String?
 
   users         User[]
   teams         Team[]
