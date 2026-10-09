@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/api-auth";
 import { leadWhereForSession } from "@/lib/access";
-import { updateSale } from "@/lib/sales";
+import { updateSale, deleteSale } from "@/lib/sales";
 
 const schema = z.object({
   amount: z.coerce.number().min(0.01).optional(),
@@ -45,4 +45,34 @@ export async function PATCH(
 
   const updated = await updateSale(prisma, saleId, parsed.data);
   return NextResponse.json({ sale: updated });
+}
+
+/**
+ * Remove a sale entirely — the initial win or an upsell added by mistake.
+ * Same access as editing one: the lead's owner or a Super Admin. Deleting
+ * the only sale on the lead is allowed too — Lead.price then recalculates
+ * down to null, same as it was before any sale was ever recorded.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; saleId: string }> }
+) {
+  const auth = await requireApiSession();
+  if ("error" in auth) return auth.error;
+  if (auth.session.role === "LEAD_ENTRY") {
+    return NextResponse.json({ error: "Not permitted for this role" }, { status: 403 });
+  }
+  const { id, saleId } = await params;
+  const { orgId } = auth.session;
+
+  const lead = await prisma.lead.findFirst({
+    where: { id, organizationId: orgId, ...leadWhereForSession(auth.session) },
+  });
+  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const sale = await prisma.sale.findFirst({ where: { id: saleId, leadId: id } });
+  if (!sale) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await deleteSale(prisma, saleId);
+  return NextResponse.json({ ok: true });
 }

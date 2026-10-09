@@ -113,6 +113,7 @@ function SaleRow({ leadId, sale, onSaved }: { leadId: string; sale: Sale; onSave
   const [description, setDescription] = useState(sale.description ?? "");
   const [amount, setAmount] = useState(sale.amount);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(e: React.FormEvent) {
@@ -136,6 +137,24 @@ function SaleRow({ leadId, sale, onSaved }: { leadId: string; sale: Sale; onSave
       onSaved();
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    const label = sale.type === "INITIAL" ? "the initial win" : "this upsell";
+    if (!window.confirm(`Delete ${label}? This removes it from revenue and reports.`)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/sales/${sale.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(typeof data.error === "string" ? data.error : "Could not delete");
+        return;
+      }
+      onSaved();
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -188,17 +207,27 @@ function SaleRow({ leadId, sale, onSaved }: { leadId: string; sale: Sale; onSave
   }
 
   return (
-    <li className="flex items-start justify-between gap-2 border-b border-slate-50 pb-2 last:border-0">
-      <div>
-        <p className="text-slate-800">{sale.type === "INITIAL" ? "Initial win" : `Upsell — ${sale.description}`}</p>
-        <p className="text-xs text-slate-400">{formatDateTime(sale.closedAt)}</p>
+    <li className="border-b border-slate-50 pb-2 last:border-0">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-slate-800">{sale.type === "INITIAL" ? "Initial win" : `Upsell — ${sale.description}`}</p>
+          <p className="text-xs text-slate-400">{formatDateTime(sale.closedAt)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-medium text-slate-800">{formatCurrency(Number(sale.amount))}</span>
+          <button onClick={() => setEditing(true)} className="text-xs text-slate-400 hover:text-indigo-600 hover:underline">
+            Edit
+          </button>
+          <button
+            onClick={remove}
+            disabled={deleting}
+            className="text-xs text-slate-400 hover:text-rose-600 hover:underline disabled:opacity-50"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="font-medium text-slate-800">{formatCurrency(Number(sale.amount))}</span>
-        <button onClick={() => setEditing(true)} className="text-xs text-slate-400 hover:text-indigo-600 hover:underline">
-          Edit
-        </button>
-      </div>
+      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
     </li>
   );
 }

@@ -71,6 +71,19 @@ export async function updateSale(
   return sale;
 }
 
+/**
+ * Removes a sale that was added by mistake — an upsell that didn't
+ * actually happen, or an initial win recorded wrong and re-entered as a
+ * fresh row. Lead.price is recalculated straight after, same as any other
+ * Sale change, so the lead's running total (and every revenue view built
+ * on top of it) drops this amount immediately.
+ */
+export async function deleteSale(db: Db, saleId: string) {
+  const sale = await db.sale.delete({ where: { id: saleId } });
+  await recalculateLeadPrice(db, sale.leadId);
+  return sale;
+}
+
 /** Adds a new upsell — always a new line, since a lead can have several over time. */
 export async function recordUpsell(
   db: Db,
