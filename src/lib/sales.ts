@@ -82,6 +82,27 @@ export async function recordUpsell(
     createdById?: string | null;
   }
 ) {
+  // A lead can be WON with a price already on it but no INITIAL sale row
+  // behind it yet — either it predates the Sale ledger, or it was won via
+  // "Skip for now" with no amount entered at the time. recalculateLeadPrice
+  // below only sums actual Sale rows, so without this, adding an upsell
+  // would silently wipe that pre-existing won value instead of adding on
+  // top of it. Back it into an INITIAL sale first so it's preserved.
+  const hasAnySale = await db.sale.findFirst({ where: { leadId: params.leadId } });
+  if (!hasAnySale) {
+    const lead = await db.lead.findUnique({ where: { id: params.leadId }, select: { price: true } });
+    if (lead?.price != null) {
+      await db.sale.create({
+        data: {
+          organizationId: params.organizationId,
+          leadId: params.leadId,
+          type: "INITIAL",
+          amount: lead.price,
+        },
+      });
+    }
+  }
+
   const sale = await db.sale.create({
     data: {
       organizationId: params.organizationId,
