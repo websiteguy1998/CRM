@@ -20,13 +20,20 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
   });
   if (!user) notFound();
 
-  const [leads, monthly] = await Promise.all([
+  const [leads, monthly, blockedAttempts] = await Promise.all([
     prisma.lead.findMany({
       where: { organizationId: session.orgId, createdById: user.id },
       include: { contact: true, owner: true },
       orderBy: { createdAt: "desc" },
     }),
     getMonthlyLeadEntry(session.orgId, user.id),
+    // Submissions this agent tried to add that got rejected as duplicates
+    // — never became a lead, so "Total added" alone can't explain them.
+    prisma.duplicateAttempt.findMany({
+      where: { organizationId: session.orgId, attemptedById: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
   ]);
 
   const tzOffsetMinutes = await getViewerTzOffset();
@@ -46,6 +53,7 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
     { label: "This week", value: weekCount },
     { label: "This month", value: monthCount },
     { label: "Total added", value: leads.length },
+    { label: "Blocked as duplicates", value: blockedAttempts.length },
     { label: "Assigned so far", value: assigned },
     { label: "Still unassigned", value: unassigned },
   ];
@@ -127,6 +135,50 @@ export default async function LeadEntryDetailPage({ params }: { params: Promise<
             </table>
           </div>
         </div>
+
+        {blockedAttempts.length > 0 && (
+          <div className="card p-5">
+            <h2 className="mb-1 text-sm font-semibold text-slate-900">
+              Blocked as duplicates ({blockedAttempts.length})
+            </h2>
+            <p className="mb-3 text-xs text-slate-400">
+              Submissions that matched an existing lead's phone, email, or website and never got created —
+              these count toward what this agent tried to enter, just not toward "Total added".
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] table-fixed text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-[11px] text-slate-500">
+                    <th className="w-40 py-1.5 font-medium">Tried to add</th>
+                    <th className="w-48 py-1.5 font-medium">Phone / Email / Website</th>
+                    <th className="w-40 py-1.5 font-medium">Already exists as</th>
+                    <th className="w-28 py-1.5 font-medium">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {blockedAttempts.map((a) => (
+                    <tr key={a.id} className="border-b border-slate-50 last:border-0">
+                      <td className="truncate py-1.5 text-slate-800">{a.clientName}</td>
+                      <td className="truncate py-1.5 text-slate-500">
+                        {[a.phone, a.email, a.websiteUrl].filter(Boolean).join(" · ") || "—"}
+                      </td>
+                      <td className="truncate py-1.5">
+                        {a.matchedLeadId ? (
+                          <Link href={`/leads/${a.matchedLeadId}`} className="text-indigo-600 hover:underline">
+                            {a.matchedClientName || "View lead"}
+                          </Link>
+                        ) : (
+                          a.matchedClientName || "—"
+                        )}
+                      </td>
+                      <td className="truncate py-1.5 text-slate-400">{relativeTime(a.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

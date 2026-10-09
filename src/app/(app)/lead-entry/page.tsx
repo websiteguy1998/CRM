@@ -13,6 +13,7 @@ type Stats = {
   thisWeek: number;
   thisMonth: number;
   unassigned: number;
+  blocked: number;
   lastAddedAt: Date | null;
 };
 
@@ -25,11 +26,22 @@ export default async function LeadEntryPage() {
     where: { organizationId: session.homeOrgId, role: "LEAD_ENTRY" },
     orderBy: { name: "asc" },
   });
+  const userIds = users.map((u) => u.id);
 
-  const leads = await prisma.lead.findMany({
-    where: { organizationId: session.orgId, createdById: { in: users.map((u) => u.id) } },
-    select: { createdById: true, createdAt: true, ownerId: true },
-  });
+  const [leads, blockedAttempts] = await Promise.all([
+    prisma.lead.findMany({
+      where: { organizationId: session.orgId, createdById: { in: userIds } },
+      select: { createdById: true, createdAt: true, ownerId: true },
+    }),
+    // Submissions rejected as duplicates — these are leads an agent tried
+    // to add that never got created. Counted alongside "Total added" so
+    // "I entered N leads" vs. what actually shows up is explainable instead
+    // of a mystery gap.
+    prisma.duplicateAttempt.findMany({
+      where: { organizationId: session.orgId, attemptedById: { in: userIds } },
+      select: { attemptedById: true },
+    }),
+  ]);
 
   const tzOffsetMinutes = await getViewerTzOffset();
   // "Today" tracks the lead-entry team's actual overnight shift (9pm–6am
@@ -41,16 +53,10 @@ export default async function LeadEntryPage() {
   const monthStart = localStartOfMonth(tzOffsetMinutes);
 
   const statsByUser = new Map<string, Stats>();
+  const empty = (): Stats => ({ total: 0, today: 0, thisWeek: 0, thisMonth: 0, unassigned: 0, blocked: 0, lastAddedAt: null });
   for (const lead of leads) {
     const key = lead.createdById as string;
-    const s = statsByUser.get(key) ?? {
-      total: 0,
-      today: 0,
-      thisWeek: 0,
-      thisMonth: 0,
-      unassigned: 0,
-      lastAddedAt: null,
-    };
+    const s = statsByUser.get(key) ?? empty();
     s.total += 1;
     if (lead.createdAt >= shiftStart && lead.createdAt < shiftEnd) s.today += 1;
     if (lead.createdAt >= weekAgo) s.thisWeek += 1;
@@ -59,7 +65,12 @@ export default async function LeadEntryPage() {
     if (!s.lastAddedAt || lead.createdAt > s.lastAddedAt) s.lastAddedAt = lead.createdAt;
     statsByUser.set(key, s);
   }
-  const empty: Stats = { total: 0, today: 0, thisWeek: 0, thisMonth: 0, unassigned: 0, lastAddedAt: null };
+  for (const a of blockedAttempts) {
+    const key = a.attemptedById as string;
+    const s = statsByUser.get(key) ?? empty();
+    s.blocked += 1;
+    statsByUser.set(key, s);
+  }
 
   return (
     <div>
@@ -78,13 +89,19 @@ export default async function LeadEntryPage() {
                 <th className="w-20 px-2.5 py-1.5 font-medium">This week</th>
                 <th className="w-24 px-2.5 py-1.5 font-medium">This month</th>
                 <th className="w-24 px-2.5 py-1.5 font-medium">Total added</th>
+                <th
+                  className="w-20 px-2.5 py-1.5 font-medium"
+                  title="Submissions rejected as duplicates — tried to add but didn't create a lead"
+                >
+                  Blocked
+                </th>
                 <th className="w-24 px-2.5 py-1.5 font-medium">Unassigned</th>
                 <th className="w-28 px-2.5 py-1.5 font-medium">Last added</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => {
-                const s = statsByUser.get(u.id) ?? empty;
+                const s = statsByUser.get(u.id) ?? empty();
                 return (
                   <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                     <td className="truncate px-2.5 py-1.5 font-medium text-slate-800">
@@ -106,6 +123,9 @@ export default async function LeadEntryPage() {
                     <td className="px-2.5 py-1.5 text-slate-600">{s.thisWeek}</td>
                     <td className="px-2.5 py-1.5 text-slate-600">{s.thisMonth}</td>
                     <td className="px-2.5 py-1.5 font-medium text-slate-800">{s.total}</td>
+                    <td className={`px-2.5 py-1.5 ${s.blocked > 0 ? "font-medium text-rose-600" : "text-slate-400"}`}>
+                      {s.blocked}
+                    </td>
                     <td className="px-2.5 py-1.5 text-slate-600">{s.unassigned}</td>
                     <td className="truncate px-2.5 py-1.5 text-slate-400">
                       {s.lastAddedAt ? relativeTime(s.lastAddedAt) : "—"}
@@ -115,7 +135,7 @@ export default async function LeadEntryPage() {
               })}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-2.5 py-10 text-center text-slate-400">
+                  <td colSpan={10} className="px-2.5 py-10 text-center text-slate-400">
                     No lead entry agents yet. Add one from Settings → Users & roles.
                   </td>
                 </tr>

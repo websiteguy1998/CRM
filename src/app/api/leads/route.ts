@@ -99,6 +99,22 @@ export async function POST(req: NextRequest) {
 
   const duplicate = await findDuplicateLead(orgId, { phone, email, websiteUrl });
   if (duplicate) {
+    // Otherwise this rejection is only ever visible to whoever was looking
+    // at the New Lead dialog at that exact moment — logged so a Super
+    // Admin can later answer "why doesn't my count match what I entered"
+    // with an actual list instead of leads just silently not existing.
+    await prisma.duplicateAttempt.create({
+      data: {
+        organizationId: orgId,
+        attemptedById: sub,
+        clientName: data.clientName,
+        phone,
+        email,
+        websiteUrl,
+        matchedLeadId: duplicate.id,
+        matchedClientName: duplicate.contact.firstName,
+      },
+    });
     return NextResponse.json(
       {
         error: "This lead is already registered in the system.",

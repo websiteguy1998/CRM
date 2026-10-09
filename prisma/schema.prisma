@@ -26,24 +26,25 @@ model Organization {
   // the CRM A login page. See lib/workspace.ts and /api/auth/handoff.
   activeWorkspaceId     String?
 
-  users         User[]
-  teams         Team[]
-  companies     Company[]
-  contacts      Contact[]
-  leadSources   LeadSource[]
-  campaigns     Campaign[]
-  pipelines     Pipeline[]
-  leads         Lead[]
-  conversations Conversation[]
-  calls         Call[]
-  tasks         Task[]
-  deals         Deal[]
-  notes         Note[]
-  activities    Activity[]
-  tags          Tag[]
-  integrations  IntegrationAccount[]
-  templates     Template[]
-  sales         Sale[]
+  users             User[]
+  teams             Team[]
+  companies         Company[]
+  contacts          Contact[]
+  leadSources       LeadSource[]
+  campaigns         Campaign[]
+  pipelines         Pipeline[]
+  leads             Lead[]
+  conversations     Conversation[]
+  calls             Call[]
+  tasks             Task[]
+  deals             Deal[]
+  notes             Note[]
+  activities        Activity[]
+  tags              Tag[]
+  integrations      IntegrationAccount[]
+  templates         Template[]
+  sales             Sale[]
+  duplicateAttempts DuplicateAttempt[]
 }
 
 enum Role {
@@ -76,16 +77,17 @@ model User {
   zoomPhoneNumber String?
   createdAt       DateTime     @default(now())
 
-  teamMemberships TeamMember[]
-  ownedLeads      Lead[]             @relation("LeadOwner")
-  createdLeads    Lead[]             @relation("LeadCreatedBy")
-  assignedTasks   Task[]             @relation("TaskAssignee")
-  calls           Call[]
-  notes           Note[]
-  activities      Activity[]
-  stageChanges    LeadStageHistory[]
-  sentMessages    Message[]
-  recordedSales   Sale[]
+  teamMemberships   TeamMember[]
+  ownedLeads        Lead[]             @relation("LeadOwner")
+  createdLeads      Lead[]             @relation("LeadCreatedBy")
+  assignedTasks     Task[]             @relation("TaskAssignee")
+  calls             Call[]
+  notes             Note[]
+  activities        Activity[]
+  stageChanges      LeadStageHistory[]
+  sentMessages      Message[]
+  recordedSales     Sale[]
+  duplicateAttempts DuplicateAttempt[]
 }
 
 // Short-lived email verification code for the public signup flow. Not
@@ -326,6 +328,32 @@ model Sale {
 
   @@index([organizationId, closedAt])
   @@index([leadId])
+}
+
+// Logged whenever POST /api/leads rejects a submission as a duplicate
+// (phone/email/website match an existing lead) — otherwise that rejection
+// is invisible to anyone but whoever was looking at the New Lead dialog at
+// that moment. A lead-entry agent doing rapid back-to-back entry can easily
+// not register a blocked submission as blocked; this gives the super admin
+// a concrete answer to "why doesn't my count match what I entered" instead
+// of leads just silently not existing. matchedLeadId/matchedClientName are
+// captured as plain values (not a Lead relation) so this row still makes
+// sense if that lead is later deleted.
+model DuplicateAttempt {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  attemptedById     String?
+  attemptedBy       User?        @relation(fields: [attemptedById], references: [id], onDelete: SetNull)
+  clientName        String
+  phone             String?
+  email             String?
+  websiteUrl        String?
+  matchedLeadId     String?
+  matchedClientName String?
+  createdAt         DateTime     @default(now())
+
+  @@index([organizationId, attemptedById, createdAt])
 }
 
 model Tag {
