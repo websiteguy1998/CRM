@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/password-input";
 
 export default function EditUserDialog({
   userId,
@@ -75,7 +76,7 @@ export default function EditUserDialog({
           </div>
           <div>
             <label className="label">New password (leave blank to keep current)</label>
-            <input name="password" type="password" minLength={8} className="input" />
+            <PasswordInput name="password" minLength={8} />
           </div>
           <div>
             <label className="label">Zoom login email (for call matching)</label>

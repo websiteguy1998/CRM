@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/password-input";
 
 export default function AddUserForm() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function AddUserForm() {
       </div>
       <div>
         <label className="label">Password</label>
-        <input name="password" type="password" required minLength={8} className="input" />
+        <PasswordInput name="password" required minLength={8} />
       </div>
       <div>
         <label className="label">Role</label>
