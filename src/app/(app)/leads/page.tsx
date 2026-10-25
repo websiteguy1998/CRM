@@ -5,11 +5,10 @@ import PageHeader from "@/components/page-header";
 import NewLeadDialog from "@/components/new-lead-dialog";
 import LeadsTable from "@/components/leads-table";
 import TimezoneOffsetInput from "@/components/timezone-offset-input";
-import { localDateBoundary } from "@/lib/format";
 import { isAdmin, leadWhereForSession } from "@/lib/access";
 import { LEAD_CATEGORIES, LEAD_CATEGORY_LABELS } from "@/lib/categories";
 import { getFirstStage } from "@/lib/pipeline";
-import type { LeadCategory, Prisma } from "@prisma/client";
+import { buildLeadsWhereClause } from "@/lib/leads-filter";
 
 type LeadsSearchParams = {
   q?: string;
@@ -51,6 +50,16 @@ function assignedTabHref(params: LeadsSearchParams, value: "" | "yes" | "no" | "
   return `/leads${query ? `?${query}` : ""}`;
 }
 
+/** Carries whatever filters are currently active on the page straight into the export download. */
+function exportHref(params: LeadsSearchParams) {
+  const qs = new URLSearchParams();
+  for (const [key, val] of Object.entries(params)) {
+    if (val) qs.set(key, val);
+  }
+  const query = qs.toString();
+  return `/api/leads/export${query ? `?${query}` : ""}`;
+}
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -74,59 +83,12 @@ export default async function LeadsPage({
     sort,
     contactInfo,
   } = params;
-  const tzOffsetMinutes = Number(tzOffset) || 0;
   const admin = isAdmin(session.role);
   const entryOnly = session.role === "LEAD_ENTRY";
   const visWhere = leadWhereForSession(session);
   const { stage: newStage } = await getFirstStage(session.orgId);
 
-  const leadWhereClause: Prisma.LeadWhereInput = {
-    organizationId: session.orgId,
-    ...visWhere,
-    ...(stageId ? { stageId } : {}),
-    ...(category ? { category: category as LeadCategory } : {}),
-    ...(admin && createdById ? { createdById } : {}),
-    ...(admin && ownerId
-      ? { ownerId }
-      : admin && assigned === "yes"
-        ? { ownerId: { not: null } }
-        : admin && assigned === "no"
-          ? { ownerId: null }
-          : admin && assigned === "new"
-            ? { stageId: newStage.id }
-            : {}),
-    ...(idCountry ? { country: { equals: idCountry, mode: "insensitive" } } : {}),
-    ...(clientCountry ? { clientCountry: { equals: clientCountry, mode: "insensitive" } } : {}),
-    ...(admin && contactInfo === "emailOnly" ? { contact: { email: { not: null }, phone: null } } : {}),
-    ...(admin && contactInfo === "phoneOnly" ? { contact: { phone: { not: null }, email: null } } : {}),
-    ...(admin && contactInfo === "phoneMandatory" ? { contact: { phone: { not: null } } } : {}),
-    ...(admin && (from || to)
-      ? {
-          createdAt: {
-            ...(from ? { gte: localDateBoundary(from, tzOffsetMinutes) } : {}),
-            ...(to ? { lte: localDateBoundary(to, tzOffsetMinutes, true) } : {}),
-          },
-        }
-      : {}),
-    ...(q
-      ? {
-          OR: [
-            { idName: { contains: q, mode: "insensitive" } },
-            { websiteUrl: { contains: q, mode: "insensitive" } },
-            { clientCountry: { contains: q, mode: "insensitive" } },
-            {
-              contact: {
-                OR: [
-                  { firstName: { contains: q, mode: "insensitive" } },
-                  { email: { contains: q, mode: "insensitive" } },
-                  { phone: { contains: q, mode: "insensitive" } },
-                ],
-              },
-            },
-          ],
-        }
-      : {}),
-  };
+  const leadWhereClause = buildLeadsWhereClause(session, params, newStage.id);
 
   const [
     leads,
@@ -230,6 +192,9 @@ export default async function LeadsPage({
         }
         actions={
           <>
+            <a href={exportHref(params)} className="btn-secondary">
+              Export Excel
+            </a>
             {admin && (
               <Link href="/leads/import" className="btn-secondary">
                 Import CSV
